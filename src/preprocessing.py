@@ -4,10 +4,14 @@ preprocessing.py
 Reusable, leak-free preprocessing pipeline for Credit Card Fraud Triage.
 Transforms the Amount feature using log1p and fits a StandardScaler strictly 
 on legitimate training data (Class == 0).
+Saves processed feature arrays, target labels, row IDs, scaler, and metadata 
+under data/processed/ for team integration.
 """
 
+import json
 import os
 from typing import Dict, List, Tuple
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -66,7 +70,6 @@ def load_and_validate_data(
         raise ValueError(f"Manifest contains invalid split labels: {unique_splits - valid_splits}")
 
     # 4. Map split label onto the raw data using row_id
-    # We use map on row_id to avoid any reordering
     split_map = dict(zip(manifest["row_id"], manifest["split"]))
     df_raw["split"] = df_raw["row_id"].map(split_map)
 
@@ -246,13 +249,13 @@ def run_preprocessing_pipeline(
     train_df, val_df, test_df = reconstruct_partitions(df)
 
     # Separate targets and row IDs
-    y_train = train_df["Class"].reset_index(drop=True)
-    y_val = val_df["Class"].reset_index(drop=True)
-    y_test = test_df["Class"].reset_index(drop=True)
+    y_train = train_df["Class"].to_numpy(dtype=int)
+    y_val = val_df["Class"].to_numpy(dtype=int)
+    y_test = test_df["Class"].to_numpy(dtype=int)
 
-    row_ids_train = train_df["row_id"].to_numpy()
-    row_ids_val = val_df["row_id"].to_numpy()
-    row_ids_test = test_df["row_id"].to_numpy()
+    row_ids_train = train_df["row_id"].to_numpy(dtype=int)
+    row_ids_val = val_df["row_id"].to_numpy(dtype=int)
+    row_ids_test = test_df["row_id"].to_numpy(dtype=int)
 
     # Step 3: Transform Amount using log1p
     X_train_unscaled = transform_amount(train_df, feature_cols)
@@ -260,7 +263,7 @@ def run_preprocessing_pipeline(
     X_test_unscaled = transform_amount(test_df, feature_cols)
 
     # Step 4: Fit scaler on legitimate training rows ONLY
-    scaler = fit_scaler_on_legitimate(X_train_unscaled, y_train)
+    scaler = fit_scaler_on_legitimate(X_train_unscaled, pd.Series(y_train))
 
     # Step 5: Transform all splits
     X_train_scaled = transform_features(scaler, X_train_unscaled)
@@ -288,14 +291,133 @@ def run_preprocessing_pipeline(
     return pipeline_data
 
 
+def save_processed_data(data: Dict, output_dir: str = "data/processed") -> List[str]:
+    """
+    Saves preprocessed arrays, target labels, row IDs, scaler, and metadata
+    under output_dir (default: data/processed) for team integration.
+    Returns list of saved file paths.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    saved_files = []
+
+    # 1. Save NumPy feature arrays
+    np_arrays = {
+        "X_train.npy": data["X_train"],
+        "X_val.npy": data["X_val"],
+        "X_test.npy": data["X_test"],
+        "y_train.npy": data["y_train"],
+        "y_val.npy": data["y_val"],
+        "y_test.npy": data["y_test"],
+        "row_ids_train.npy": data["row_ids_train"],
+        "row_ids_val.npy": data["row_ids_val"],
+        "row_ids_test.npy": data["row_ids_test"],
+    }
+
+    for filename, array in np_arrays.items():
+        filepath = os.path.join(output_dir, filename)
+        np.save(filepath, array)
+        saved_files.append(filepath)
+
+    # 2. Save feature names JSON
+    feature_names_path = os.path.join(output_dir, "feature_names.json")
+    with open(feature_names_path, "w", encoding="utf-8") as f:
+        json.dump(data["feature_names"], f, indent=2)
+    saved_files.append(feature_names_path)
+
+    # 3. Save fitted scaler using joblib
+    scaler_path = os.path.join(output_dir, "scaler.joblib")
+    joblib.dump(data["scaler"], scaler_path)
+    saved_files.append(scaler_path)
+
+    # 4. Save preprocessing metadata JSON
+    metadata = {
+        "source_dataset_path": "data/raw/creditcard.csv",
+        "split_manifest_path": "data/splits/split_manifest.csv",
+        "feature_count": len(data["feature_names"]),
+        "feature_names": data["feature_names"],
+        "amount_transformation": "np.log1p(Amount)",
+        "scaler_type": "StandardScaler",
+        "scaler_fit_criteria": "Training partition rows where Class == 0 only (legitimate transactions)",
+        "scaler_n_samples_seen": int(data["scaler"].n_samples_seen_),
+        "partitions": {
+            "train": {
+                "total_rows": int(len(data["X_train"])),
+                "fraud_count": int((data["y_train"] == 1).sum()),
+                "legitimate_count": int((data["y_train"] == 0).sum()),
+                "fraud_percentage": float((data["y_train"] == 1).mean() * 100),
+            },
+            "validation": {
+                "total_rows": int(len(data["X_val"])),
+                "fraud_count": int((data["y_val"] == 1).sum()),
+                "legitimate_count": int((data["y_val"] == 0).sum()),
+                "fraud_percentage": float((data["y_val"] == 1).mean() * 100),
+            },
+            "test": {
+                "total_rows": int(len(data["X_test"])),
+                "fraud_count": int((data["y_test"] == 1).sum()),
+                "legitimate_count": int((data["y_test"] == 0).sum()),
+                "fraud_percentage": float((data["y_test"] == 1).mean() * 100),
+            },
+        },
+    }
+
+    metadata_path = os.path.join(output_dir, "preprocessing_metadata.json")
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2)
+    saved_files.append(metadata_path)
+
+    return saved_files
+
+
+def load_processed_data(processed_dir: str = "data/processed") -> Dict:
+    """
+    Convenience function for team members to load all preprocessed artifacts.
+    """
+    if not os.path.exists(processed_dir):
+        raise FileNotFoundError(f"Processed directory not found: {processed_dir}")
+
+    data = {
+        "X_train": np.load(os.path.join(processed_dir, "X_train.npy")),
+        "X_val": np.load(os.path.join(processed_dir, "X_val.npy")),
+        "X_test": np.load(os.path.join(processed_dir, "X_test.npy")),
+        "y_train": np.load(os.path.join(processed_dir, "y_train.npy")),
+        "y_val": np.load(os.path.join(processed_dir, "y_val.npy")),
+        "y_test": np.load(os.path.join(processed_dir, "y_test.npy")),
+        "row_ids_train": np.load(os.path.join(processed_dir, "row_ids_train.npy")),
+        "row_ids_val": np.load(os.path.join(processed_dir, "row_ids_val.npy")),
+        "row_ids_test": np.load(os.path.join(processed_dir, "row_ids_test.npy")),
+    }
+
+    scaler_path = os.path.join(processed_dir, "scaler.joblib")
+    if os.path.exists(scaler_path):
+        data["scaler"] = joblib.load(scaler_path)
+
+    feature_names_path = os.path.join(processed_dir, "feature_names.json")
+    if os.path.exists(feature_names_path):
+        with open(feature_names_path, "r", encoding="utf-8") as f:
+            data["feature_names"] = json.load(f)
+
+    metadata_path = os.path.join(processed_dir, "preprocessing_metadata.json")
+    if os.path.exists(metadata_path):
+        with open(metadata_path, "r", encoding="utf-8") as f:
+            data["metadata"] = json.load(f)
+
+    return data
+
+
 if __name__ == "__main__":
     print("Executing preprocessing pipeline...")
-    data = run_preprocessing_pipeline()
+    pipeline_data = run_preprocessing_pipeline()
 
-    print("\n=== PREPROCESSING COMPLETED SUCCESSFULLY ===")
-    print(f"Features:                 {len(data['feature_names'])} {data['feature_names'][:3]} ... {data['feature_names'][-1]}")
-    print(f"Scaler samples seen:      {int(data['scaler'].n_samples_seen_):,} legitimate training rows (Class == 0)")
-    print(f"X_train shape:            {data['X_train'].shape} | Fraud: {(data['y_train'] == 1).sum():,}")
-    print(f"X_val shape:              {data['X_val'].shape}  | Fraud: {(data['y_val'] == 1).sum():,}")
-    print(f"X_test shape:             {data['X_test'].shape}  | Fraud: {(data['y_test'] == 1).sum():,}")
-    print("All validation checks passed with zero errors.")
+    print("\nSaving processed datasets to data/processed/ ...")
+    saved_files_list = save_processed_data(pipeline_data)
+
+    print("\n=== PREPROCESSING COMPLETED AND SAVED SUCCESSFULLY ===")
+    print(f"Features:                 {len(pipeline_data['feature_names'])} {pipeline_data['feature_names'][:3]} ... {pipeline_data['feature_names'][-1]}")
+    print(f"Scaler samples seen:      {int(pipeline_data['scaler'].n_samples_seen_):,} legitimate training rows (Class == 0)")
+    print(f"X_train shape:            {pipeline_data['X_train'].shape} | Fraud: {(pipeline_data['y_train'] == 1).sum():,}")
+    print(f"X_val shape:              {pipeline_data['X_val'].shape}  | Fraud: {(pipeline_data['y_val'] == 1).sum():,}")
+    print(f"X_test shape:             {pipeline_data['X_test'].shape}  | Fraud: {(pipeline_data['y_test'] == 1).sum():,}")
+    print(f"Total files saved:        {len(saved_files_list)}")
+    for fpath in saved_files_list:
+        print(f"  - {fpath}")
