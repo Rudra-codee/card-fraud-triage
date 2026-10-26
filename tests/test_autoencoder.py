@@ -147,6 +147,36 @@ class TestAutoencoderModel(unittest.TestCase):
             out_loaded = loaded_model(x)
         torch.testing.assert_close(out_orig, out_loaded)
 
+    def test_07_compute_autoencoder_scores_shape_and_finite(self):
+        """Validates that scoring returns a 1D array of finite, non-negative floats."""
+        from src.autoencoder_scoring import compute_autoencoder_scores
+        model = create_autoencoder_model()
+        X = np.random.randn(45, 29)
+        scores = compute_autoencoder_scores(model, X, batch_size=16)
+
+        self.assertEqual(scores.ndim, 1)
+        self.assertEqual(len(scores), 45)
+        self.assertTrue(np.isfinite(scores).all())
+        self.assertTrue((scores >= 0.0).all())
+
+    def test_08_score_dataframe_creation_and_row_id_alignment(self):
+        """Validates create_score_dataframe integration with row IDs."""
+        from src.autoencoder_scoring import compute_autoencoder_scores
+        from src.scoring import create_score_dataframe
+        model = create_autoencoder_model()
+        X = np.random.randn(10, 29)
+        row_ids = np.array([101, 102, 103, 104, 105, 106, 107, 108, 109, 110])
+        labels = np.array([0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
+
+        scores = compute_autoencoder_scores(model, X)
+        score_df = create_score_dataframe(row_ids=row_ids, scores=scores, split="val", labels=labels)
+
+        self.assertEqual(len(score_df), 10)
+        np.testing.assert_array_equal(score_df["row_id"].values, row_ids)
+        np.testing.assert_array_equal(score_df["Class"].values, labels)
+        self.assertEqual(list(score_df["split"].unique()), ["val"])
+
 
 if __name__ == "__main__":
     unittest.main()
+
