@@ -14,7 +14,7 @@ An academic and research prototype for prioritizing suspicious credit card trans
 * **Completed:** Dataset verification, exploratory data analysis, chronological train/validation/test splitting (Strategy B: Timestamp Boundary Alignment), leak-free preprocessing, GMM baseline implementation (\(K=1\), full covariance), negative log-likelihood scoring, automated unit testing (11/11 passing), numerical stability audit, and baseline freeze.
 * **Current Stage:** **Phase 1 — GMM Baseline Frozen and Handed Off.**
 * **Next Stage:** **Phase 1 — Model Selection (Member 3):** Component tuning (\(K \in \{2, 3, 4, 5\}\)), covariance structures (`full`, `diag`, `tied`), AIC/BIC analysis, and validation evaluation.
-
+* **Disclaimer:** *This repository contains a research prototype for decision-support triage. It is not a production-deployed payment security system and does not claim commercial fraud-detection effectiveness.*
 
 ---
 
