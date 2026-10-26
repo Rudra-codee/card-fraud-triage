@@ -1,0 +1,75 @@
+{
+  "test_rows": 56962,
+  "test_legitimate": 56887,
+  "test_fraud": 75,
+  "fraud_prevalence": 0.001316667251852112,
+  "feature_count": 29,
+  "manifest_match": true,
+  "row_ids_unique": true,
+  "X_test_finite": true,
+  "models": {
+    "gmm_baseline": {
+      "artifact_path": "models/gmm_baseline.joblib",
+      "score_finite": true,
+      "distinct_scores": 55528,
+      "test_ap": 0.1610349872113048,
+      "test_ap_ci": [
+        0.12076002526480926,
+        0.2208794221636246
+      ],
+      "test_roc_auc": 0.9621748378364126,
+      "frozen_th_1pct": 158.81380296025483,
+      "recall_at_1pct": 0.72,
+      "actual_fpr_1pct": 0.00664475187652715,
+      "tp_1pct": 54,
+      "fp_1pct": 378,
+      "frozen_th_5pct": 60.72575217322757,
+      "recall_at_5pct": 0.84,
+      "actual_fpr_5pct": 0.04013219188918382,
+      "tp_5pct": 63,
+      "fp_5pct": 2283
+    },
+    "gmm_k4_full": {
+      "artifact_path": "models/candidates/gmm_k4_full.joblib",
+      "score_finite": true,
+      "distinct_scores": 55528,
+      "test_ap": 0.5769642246654952,
+      "test_ap_ci": [
+        0.4587945735666109,
+        0.6972742571086089
+      ],
+      "test_roc_auc": 0.9156383708052807,
+      "frozen_th_1pct": 66.43595478102685,
+      "recall_at_1pct": 0.76,
+      "actual_fpr_1pct": 0.005888867403800517,
+      "tp_1pct": 57,
+      "fp_1pct": 335,
+      "frozen_th_5pct": 50.24139607102004,
+      "recall_at_5pct": 0.8,
+      "actual_fpr_5pct": 0.036844973368256366,
+      "tp_5pct": 60,
+      "fp_5pct": 2096
+    },
+    "autoencoder_baseline": {
+      "artifact_path": "models/autoencoder_baseline.pt",
+      "score_finite": true,
+      "distinct_scores": 55433,
+      "test_ap": 0.17932771388872998,
+      "test_ap_ci": [
+        0.1318409472998271,
+        0.24467562983124186
+      ],
+      "test_roc_auc": 0.9435882832047159,
+      "frozen_th_1pct": 2.651143789291382,
+      "recall_at_1pct": 0.7333333333333333,
+      "actual_fpr_1pct": 0.005590029356443475,
+      "tp_1pct": 55,
+      "fp_1pct": 318,
+      "frozen_th_5pct": 1.341099739074707,
+      "recall_at_5pct": 0.8,
+      "actual_fpr_5pct": 0.03601877406085749,
+      "tp_5pct": 60,
+      "fp_5pct": 2049
+    }
+  }
+}

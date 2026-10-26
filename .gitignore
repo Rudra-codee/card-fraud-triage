@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+
+# Generated results
+results/figures/*
+results/tables/*
+
+# Small, shareable triage evaluation outputs (Member 4, Task 1).
+# triage_pr_curve_data.csv (~18 MB) stays ignored; regenerate it with scripts/run_triage_evaluation.py
+!results/tables/triage_model_comparison.csv
+!results/tables/triage_validation_checks.json
+!results/tables/triage_review_capacity.csv
+!results/tables/triage_fpr_thresholds.csv
+!results/tables/triage_stability_check.csv
+!results/figures/triage_precision_recall_curve.png
+
+# Final held-out test evaluation outputs (Member 4, Task A)
+!results/tables/final_test_model_comparison.csv
+!results/tables/final_test_threshold_metrics.csv
+!results/tables/final_test_review_capacity.csv
+!results/tables/final_test_val_vs_test_comparison.csv
+!results/tables/final_test_validation_checks.json
+!results/figures/final_test_precision_recall_curve.png
+!results/figures/final_test_review_capacity.png
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
