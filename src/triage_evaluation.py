@@ -195,6 +195,74 @@ def recall_at_fpr(labels: np.ndarray, scores: np.ndarray, max_fpr: float) -> Dic
     }
 
 
+def metrics_at_alert_budget(labels: np.ndarray, scores: np.ndarray, budget: int) -> Dict[str, Any]:
+    """
+    Metrics when analysts can review at most `budget` alerts (the highest-scoring rows).
+
+    This is a different constraint from a fixed FPR: the number of alerts is fixed,
+    and the number of false positives is whatever falls inside that budget.
+
+    Tie handling (same rule as recall_at_fpr):
+    - Flag every row scoring >= the budget-th highest score.
+    - If tied scores at the cut-off would push the alert count above the budget,
+      the whole tied group is left out, so alerts can be below the budget but never above it.
+    """
+    labels = np.asarray(labels)
+    scores = np.asarray(scores, dtype=float)
+    validate_labels(labels)
+    validate_scores(scores, len(labels))
+
+    if budget < 1:
+        raise ValueError(f"budget must be at least 1, got {budget}")
+
+    if budget >= len(scores):
+        flagged = np.ones(len(scores), dtype=bool)
+    else:
+        sorted_scores = np.sort(scores)[::-1]
+        cutoff_score = sorted_scores[budget - 1]
+        flagged = scores >= cutoff_score
+        if flagged.sum() > budget:
+            # The tie at the cut-off does not fit in the budget, so drop the whole tied group
+            flagged = scores > cutoff_score
+
+    is_fraud = labels == 1
+    is_legit = labels == 0
+    alerts = int(flagged.sum())
+    true_positives = int((flagged & is_fraud).sum())
+    false_positives = int((flagged & is_legit).sum())
+
+    return {
+        "budget": int(budget),
+        "alerts": alerts,
+        "threshold": float(scores[flagged].min()) if alerts > 0 else float("inf"),
+        "frauds_caught": true_positives,
+        "false_positives": false_positives,
+        "precision": true_positives / alerts if alerts > 0 else 0.0,
+        "recall": true_positives / int(is_fraud.sum()),
+        "fpr": false_positives / int(is_legit.sum()),
+    }
+
+
+def metrics_at_fpr_limit(labels: np.ndarray, scores: np.ndarray, max_fpr: float) -> Dict[str, Any]:
+    """
+    Same as recall_at_fpr, but also reports precision and review volume,
+    so FPR-based thresholds can be compared with fixed alert budgets.
+    """
+    result = recall_at_fpr(labels, scores, max_fpr)
+    alerts = result["alerts"]
+
+    return {
+        "max_fpr": float(max_fpr),
+        "alerts": alerts,
+        "threshold": result["threshold"],
+        "frauds_caught": result["true_positives"],
+        "false_positives": result["false_positives"],
+        "precision": result["true_positives"] / alerts if alerts > 0 else 0.0,
+        "recall": result["recall"],
+        "fpr": result["actual_fpr"],
+    }
+
+
 def precision_recall_data(labels: np.ndarray, scores: np.ndarray) -> pd.DataFrame:
     """
     Precision-Recall curve points from sklearn.metrics.precision_recall_curve.
@@ -274,11 +342,15 @@ def evaluate_scores(
         "actual_fpr_1pct": at_1pct["actual_fpr"],
         "tp_1pct_fpr": at_1pct["true_positives"],
         "fp_1pct_fpr": at_1pct["false_positives"],
+        "alerts_1pct_fpr": at_1pct["alerts"],
+        "precision_1pct_fpr": at_1pct["true_positives"] / at_1pct["alerts"] if at_1pct["alerts"] > 0 else 0.0,
         "recall_at_5pct_fpr": at_5pct["recall"],
         "threshold_5pct_fpr": at_5pct["threshold"],
         "actual_fpr_5pct": at_5pct["actual_fpr"],
         "tp_5pct_fpr": at_5pct["true_positives"],
         "fp_5pct_fpr": at_5pct["false_positives"],
+        "alerts_5pct_fpr": at_5pct["alerts"],
+        "precision_5pct_fpr": at_5pct["true_positives"] / at_5pct["alerts"] if at_5pct["alerts"] > 0 else 0.0,
     }
 
     if n_bootstrap > 0:

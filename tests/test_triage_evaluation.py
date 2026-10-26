@@ -18,6 +18,8 @@ from src.triage_evaluation import (
     check_manifest_matches,
     evaluate_scores,
     load_validation_data,
+    metrics_at_alert_budget,
+    metrics_at_fpr_limit,
     precision_recall_data,
     recall_at_fpr,
     validate_scores,
@@ -117,6 +119,55 @@ class TestRecallAtFPR(unittest.TestCase):
         self.assertTrue(np.isinf(result["threshold"]))
         self.assertEqual(result["alerts"], 0)
         self.assertEqual(result["recall"], 0.0)
+
+
+class TestAlertBudget(unittest.TestCase):
+    def setUp(self):
+        # 8 legit, 4 fraud. Ranking by score (high to low):
+        # 20 F, 19 F, 18 L, 17 F, 16 L, 15 L, 14 F, then legit 1..5
+        self.labels = np.array([1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0])
+        self.scores = np.array([20, 19, 18, 17, 16, 15, 14, 1, 2, 3, 4, 5], dtype=float)
+
+    def test_top_k_counts(self):
+        result = metrics_at_alert_budget(self.labels, self.scores, budget=4)
+        self.assertEqual(result["alerts"], 4)
+        self.assertEqual(result["frauds_caught"], 3)
+        self.assertEqual(result["false_positives"], 1)
+        self.assertAlmostEqual(result["precision"], 0.75)
+        self.assertAlmostEqual(result["recall"], 0.75)
+        self.assertAlmostEqual(result["fpr"], 1 / 8)
+        self.assertEqual(result["threshold"], 17.0)
+
+    def test_budget_larger_than_dataset_flags_everything(self):
+        result = metrics_at_alert_budget(self.labels, self.scores, budget=100)
+        self.assertEqual(result["alerts"], 12)
+        self.assertAlmostEqual(result["recall"], 1.0)
+
+    def test_tie_at_cutoff_never_exceeds_budget(self):
+        # Scores 9, 8, 8, 8, 1: a budget of 2 cuts through the tie at 8
+        labels = np.array([1, 1, 0, 0, 0])
+        scores = np.array([9.0, 8.0, 8.0, 8.0, 1.0])
+        result = metrics_at_alert_budget(labels, scores, budget=2)
+        self.assertEqual(result["alerts"], 1)
+        self.assertEqual(result["frauds_caught"], 1)
+        self.assertEqual(result["threshold"], 9.0)
+
+        # A budget of 4 fits the whole tie
+        result = metrics_at_alert_budget(labels, scores, budget=4)
+        self.assertEqual(result["alerts"], 4)
+        self.assertEqual(result["frauds_caught"], 2)
+        self.assertEqual(result["false_positives"], 2)
+
+    def test_invalid_budget_rejected(self):
+        with self.assertRaises(ValueError):
+            metrics_at_alert_budget(self.labels, self.scores, budget=0)
+
+    def test_fpr_limit_reports_precision_and_volume(self):
+        result = metrics_at_fpr_limit(self.labels, self.scores, max_fpr=1 / 8)
+        # One legit row allowed: flag 20, 19, 18, 17 (stop before legit 16)
+        self.assertEqual(result["alerts"], 4)
+        self.assertEqual(result["frauds_caught"], 3)
+        self.assertAlmostEqual(result["precision"], 0.75)
 
 
 class TestInputValidation(unittest.TestCase):
