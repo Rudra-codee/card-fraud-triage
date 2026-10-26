@@ -17,6 +17,9 @@ results/tables/*
 # triage_pr_curve_data.csv (~18 MB) stays ignored; regenerate it with scripts/run_triage_evaluation.py
 !results/tables/triage_model_comparison.csv
 !results/tables/triage_validation_checks.json
+!results/tables/triage_review_capacity.csv
+!results/tables/triage_fpr_thresholds.csv
+!results/tables/triage_stability_check.csv
 !results/figures/triage_precision_recall_curve.png
 
 # OS

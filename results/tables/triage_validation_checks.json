@@ -12,6 +12,14 @@
       "n_training_samples": 170528,
       "train_fraud_excluded": 360,
       "reg_covar": 1e-06,
+      "conditioning": {
+        "min_eigenvalue": 0.26992604428964095,
+        "max_condition_number": 6.475153320531938,
+        "eigenvalues_within_10x_of_reg_covar": 0,
+        "component_weights": [
+          1.0
+        ]
+      },
       "scores_finite": true,
       "n_distinct_scores": 55851,
       "fraud_median_score": 273.525715140728,
@@ -26,6 +34,15 @@
       "n_training_samples": 170528,
       "train_fraud_excluded": 360,
       "reg_covar": 1e-06,
+      "conditioning": {
+        "min_eigenvalue": 9.99999999930369e-07,
+        "max_condition_number": 1555121.1319109302,
+        "eigenvalues_within_10x_of_reg_covar": 2,
+        "component_weights": [
+          0.3298,
+          0.6702
+        ]
+      },
       "scores_finite": true,
       "n_distinct_scores": 55851,
       "fraud_median_score": 123.09867001701184,
@@ -42,6 +59,16 @@
       "n_training_samples": 170528,
       "train_fraud_excluded": 360,
       "reg_covar": 1e-06,
+      "conditioning": {
+        "min_eigenvalue": 9.99999999780724e-07,
+        "max_condition_number": 2520622.448647747,
+        "eigenvalues_within_10x_of_reg_covar": 9,
+        "component_weights": [
+          0.6967,
+          0.0945,
+          0.2088
+        ]
+      },
       "scores_finite": true,
       "n_distinct_scores": 55851,
       "fraud_median_score": 113.55059606586835,
@@ -58,6 +85,17 @@
       "n_training_samples": 170528,
       "train_fraud_excluded": 360,
       "reg_covar": 1e-06,
+      "conditioning": {
+        "min_eigenvalue": 9.999999996967035e-07,
+        "max_condition_number": 1926671.7100404936,
+        "eigenvalues_within_10x_of_reg_covar": 16,
+        "component_weights": [
+          0.065,
+          0.372,
+          0.4676,
+          0.0955
+        ]
+      },
       "scores_finite": true,
       "n_distinct_scores": 55851,
       "fraud_median_score": 169.84428430321583,
@@ -93,6 +131,18 @@
       "n_training_samples": 170528,
       "train_fraud_excluded": 360,
       "reg_covar": 1e-06,
+      "conditioning": {
+        "min_eigenvalue": 9.999999998887701e-07,
+        "max_condition_number": 3455516.251706447,
+        "eigenvalues_within_10x_of_reg_covar": 18,
+        "component_weights": [
+          0.3472,
+          0.0821,
+          0.4127,
+          0.0656,
+          0.0924
+        ]
+      },
       "scores_finite": true,
       "n_distinct_scores": 55851,
       "fraud_median_score": 100.6257802849321,
