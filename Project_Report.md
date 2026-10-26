@@ -98,7 +98,7 @@ $$p(x \mid \theta) = \sum_{k=1}^K \pi_k \, \mathcal{N}(x \mid \mu_k, \Sigma_k), 
 Anomaly severity follows the negative log-likelihood convention:
 $$\mathrm{Score}_{\mathrm{GMM}}(x) = -\ln p(x \mid \hat{\theta}_{\mathrm{GMM}})$$
 
-#### 4.1.1 Frozen Single-Component Baseline (`models/gmm_baseline.joblib`)
+#### 4.1.1 Frozen Single-Component Baseline (`models/gmmbaseline.joblib`)
 * **Configuration:** $K=1$, full covariance ($29 \times 29$), $\text{reg\_covar} = 10^{-6}, n\_\text{init} = 5, \text{random\_state} = 42$.
 * **Training Subset:** $170,528$ legitimate training rows (all 360 training frauds excluded).
 * **Parameters:** $464$ free parameters (29 means + 435 unique covariance elements).
