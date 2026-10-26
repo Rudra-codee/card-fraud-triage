@@ -11,7 +11,7 @@
 
 ### 1.1 The Operational Problem in Commercial Card Fraud
 Credit card fraud detection is one of the most critical challenges in financial technology and payment security. In real-world banking rails, detection systems must contend with three major structural hurdles:
-1. **Extreme Class Imbalance:** Fraudulent transactions account for less than $0.2\%$ of total transaction traffic (in this benchmark, $492$ out of $284,807$ records, or $0.1727\%$). Standard machine learning classification accuracy is completely ineffective: a naive model predicting 100% legitimate transactions achieves $>99.8\%$ accuracy while failing to intercept any fraud.
+1. **Extreme Class Imbalance:** Fraudulent transactions account for less than 0.2% of total transaction traffic (in this benchmark, $492$ out of $284,807$ records, or 0.1727%). Standard machine learning classification accuracy is completely ineffective: a naive model predicting 100% legitimate transactions achieves >99.8% accuracy while failing to intercept any fraud.
 2. **Severe Alert Fatigue on Human Triage Teams:** Commercial card fraud operations rely on human fraud analysts (triage desks) who review flagged alerts. These teams operate under finite daily investigation budgets (e.g., $50$ to $500$ alerts per shift). When automated systems trigger high false alarm rates, analysts become overwhelmed, leading to missed fraud and costly delays.
 3. **Adversarial Non-Stationarity & Novel Attack Vectors:** Fraudsters continually adapt their behavior to bypass static business rules and supervised models that overfit to historical fraud patterns. Supervised models often struggle to identify zero-day attack vectors that do not match past training labels.
 
@@ -21,7 +21,7 @@ Rather than treating fraud detection as a standard supervised classification pro
 * **Dual-Paradigm Anomaly Scoring:**
   1. **Probabilistic Density Estimation (GMM):** Quantifies statistical rarity via Negative Log-Likelihood ($\mathrm{NLL} = -\ln p(x \mid \hat{\theta}_{\mathrm{GMM}})$). Transactions falling in low-density tail regions receive high anomaly scores.
   2. **Deep Neural Reconstruction (Autoencoder):** Quantifies feature abnormality via per-sample Mean Squared Reconstruction Error ($\mathrm{MSE} = \frac{1}{29} \sum_{j=1}^{29} (x_j - \hat{x}_j)^2$). Transactions deviating from the learned normal spending manifold incur high reconstruction error.
-* **Triage Prioritization:** Incoming prospective transactions are ranked by anomaly severity to maximize fraud interception within strict analyst review capacity constraints (e.g., Top 50 alerts or False Positive Rate $\le 1\%$).
+* **Triage Prioritization:** Incoming prospective transactions are ranked by anomaly severity to maximize fraud interception within strict analyst review capacity constraints (e.g., Top 50 alerts or False Positive Rate $\le 1$%).
 
 ---
 
@@ -30,8 +30,8 @@ Rather than treating fraud detection as a standard supervised classification pro
 ### 2.1 Raw Dataset Specification
 The project is built and benchmarked on the canonical European cardholder credit card transaction dataset (`creditcard.csv`):
 * **Source:** Transactions made by European cardholders in September 2013 across a 48-hour continuous window.
-* **Total Transactions:** `284,807` records ($150.8\text{ MB}$, tracked via Git LFS).
-* **Ground-Truth Distribution:** `284,315` legitimate transactions ($99.8273\%$) and `492` fraudulent transactions ($0.1727\%$).
+* **Total Transactions:** `284,807` records (150.8 MB, tracked via Git LFS).
+* **Ground-Truth Distribution:** `284,315` legitimate transactions (99.8273%) and `492` fraudulent transactions (0.1727%).
 * **Raw Features (31 columns):**
   * `Time`: Seconds elapsed between each transaction and the first transaction in the dataset ($0.0\text{s}$ to $172,792.0\text{s}$).
   * `V1`–`V28`: Numerical feature projections obtained via Principal Component Analysis (PCA) to preserve cardholder privacy.
@@ -46,9 +46,9 @@ A formal data quality audit established the preprocessing rules for the raw data
 | **Missing Values** | `0` null values across all 31 columns | Take no action | Dataset is complete; no imputation required. |
 | **Infinite Values** | `0` positive or negative infinite values | Take no action | All numeric features are finite and well-bounded. |
 | **Data Types** | 30 columns `float64`, 1 column `int64` (`Class`) | Retain original types | All columns are already correctly typed. |
-| **Zero-Dollar Transactions** | 1,825 transactions are `$0.00` | **Retain 100% as valid** | Zero amounts represent card authorization pings / account verification pings; account for $5.49\%$ of frauds vs $0.63\%$ of legitimate transactions. $\ln(1+0) = 0$ is mathematically safe. |
+| **Zero-Dollar Transactions** | 1,825 transactions are `$0.00` | **Retain 100% as valid** | Zero amounts represent card authorization pings / account verification pings; account for 5.49% of frauds vs 0.63% of legitimate transactions. $\ln(1+0) = 0$ is mathematically safe. |
 | **Extreme Outliers** | Max Amount: $€25,691.16$; long tails on $V_1..V_{28}$ | **Retain all outliers** | Real financial transactions naturally exhibit heavy tails; clipping or removing legitimate variance would bias anomaly detection. |
-| **Exact Duplicate Rows** | 1,081 redundant duplicate copies (1,854 total rows in duplicate groups) | **Option 3 Approved: Retain all duplicate rows** | Exact duplicates represent automated carding bot bursts or gateway retries; deleting them would destroy 19 rare fraud cases ($3.86\%$ of all positives). All duplicate clusters fall cleanly within single split partitions. |
+| **Exact Duplicate Rows** | 1,081 redundant duplicate copies (1,854 total rows in duplicate groups) | **Option 3 Approved: Retain all duplicate rows** | Exact duplicates represent automated carding bot bursts or gateway retries; deleting them would destroy 19 rare fraud cases (3.86% of all positives). All duplicate clusters fall cleanly within single split partitions. |
 
 ---
 
@@ -98,8 +98,8 @@ $$p(x \mid \theta) = \sum_{k=1}^K \pi_k \, \mathcal{N}(x \mid \mu_k, \Sigma_k), 
 Anomaly severity follows the negative log-likelihood convention:
 $$\mathrm{Score}_{\mathrm{GMM}}(x) = -\ln p(x \mid \hat{\theta}_{\mathrm{GMM}})$$
 
-#### 4.1.1 Frozen Single-Component Baseline (`models/gmmbaseline.joblib`)
-* **Configuration:** $K=1$, full covariance ($29 \times 29$), $\text{reg\_covar} = 10^{-6}, n\_\text{init} = 5, \text{random\_state} = 42$.
+#### 4.1.1 Frozen Single-Component Baseline (`models/gmm_baseline.joblib`)
+* **Configuration:** $K=1$, full covariance ($29 \times 29$), `reg_covar = 1e-6`, `n_init = 5`, `random_state = 42`.
 * **Training Subset:** $170,528$ legitimate training rows (all 360 training frauds excluded).
 * **Parameters:** $464$ free parameters (29 means + 435 unique covariance elements).
 * **Numerical Stability:** Eigenvalues $\lambda_{\min} = 0.2699, \lambda_{\max} = 1.7478$; condition number $\kappa = 6.475$ (exceptionally well-conditioned, globally convex Mahalanobis metric).
@@ -165,18 +165,18 @@ Scores are joined to ground-truth labels using a one-to-one merge on stable `row
 ```
 
 ### 5.3 Why Accuracy and F1-Score are Misleading
-* **Accuracy:** A model predicting zero fraud achieves $99.87\%$ accuracy on test data while catching zero fraud cases.
+* **Accuracy:** A model predicting zero fraud achieves 99.87% accuracy on test data while catching zero fraud cases.
 * **F1-Score:** Standard F1 assumes an arbitrary $0.5$ decision threshold that has no meaning for unbounded continuous anomaly scores ($-\ln p(x) \in [28, 5200+]$, $\text{MSE} \in [0.05, 190+]$).
 * **Selected Primary Metrics:**
   * **Average Precision (AP / PR-AUC):** Area under the Precision-Recall curve across all operational thresholds (random baseline $\approx 0.0013$).
-  * **Recall @ Fixed FPR ($\le 1\%, \le 5\%$):** Fraud catch rate when false alarms are strictly capped.
+  * **Recall @ Fixed FPR ($\le 1$%, $\le 5$%):** Fraud catch rate when false alarms are strictly capped.
   * **Top-N Alert Capacity (N = 50, 100, 200, 500):** Realized precision and fraud yield under strict workforce constraints.
 
 ---
 
 ## 6. Final Held-Out Test Evaluation Benchmark Results
 
-The final benchmark evaluated frozen candidate models on the chronological held-out test partition ($56,962$ transactions, $75$ fraud cases, $0.1317\%$ prevalence) using **frozen operating thresholds derived from the validation set**.
+The final benchmark evaluated frozen candidate models on the chronological held-out test partition ($56,962$ transactions, $75$ fraud cases, 0.1317% prevalence) using **frozen operating thresholds derived from the validation set**.
 
 ### 6.1 Primary Test Benchmark Comparison Table
 *Source:* `results/tables/final_test_model_comparison.csv` and `results/tables/final_test_threshold_metrics.csv`
@@ -191,11 +191,11 @@ The final benchmark evaluated frozen candidate models on the chronological held-
 | └ 95% Bootstrap CI | [0.1208, 0.2209] | [0.4588, 0.6973] | [0.1318, 0.2447] |
 | **ROC-AUC** | **0.9622** | 0.9156 | 0.9436 |
 | **Recall @ Frozen 1% Val Threshold** | **72.00% (54 / 75)** | **76.00% (57 / 75)** | **73.33% (55 / 75)** |
-| └ Frozen Threshold Value ($\tau_{1\%}$) | 158.814 (NLL) | 66.436 (NLL) | 2.651 (MSE) |
+| └ Frozen Threshold Value ($\tau$ at 1% FPR) | 158.814 (NLL) | 66.436 (NLL) | 2.651 (MSE) |
 | └ Realized Test FPR | 0.6645% (378 FP) | 0.5889% (335 FP) | 0.5590% (318 FP) |
 | └ Total Alerts & Precision | 432 alerts (12.50%) | 392 alerts (14.54%) | 373 alerts (14.75%) |
 | **Recall @ Frozen 5% Val Threshold** | **84.00% (63 / 75)** | **80.00% (60 / 75)** | **80.00% (60 / 75)** |
-| └ Frozen Threshold Value ($\tau_{5\%}$) | 60.726 (NLL) | 50.241 (NLL) | 1.341 (MSE) |
+| └ Frozen Threshold Value ($\tau$ at 5% FPR) | 60.726 (NLL) | 50.241 (NLL) | 1.341 (MSE) |
 | └ Realized Test FPR | 4.0132% (2,283 FP) | 3.6845% (2,096 FP) | 3.6019% (2,049 FP) |
 | └ Total Alerts & Precision | 2,346 alerts (2.69%) | 2,156 alerts (2.78%) | 2,109 alerts (2.84%) |
 
@@ -220,10 +220,10 @@ The final benchmark evaluated frozen candidate models on the chronological held-
 ### 6.3 Validation vs. Test Generalization Findings
 *Source:* `results/tables/final_test_val_vs_test_comparison.csv`
 
-1. **Increase in Average Precision Across Models:** Average precision increased across all models on test data ($0.074 \to 0.161$ for baseline, $0.076 \to 0.179$ for AE, $0.484 \to 0.577$ for $K=4$). The test partition had a higher fraud prevalence ($0.1317\%$ vs. $0.1001\%$, a $+31.6\%$ relative increase). While differences in prevalence and the ranking of individual fraud transactions may contribute to the observed change, the available analysis does not establish a causal explanation or confirm formal fraud clustering.
-2. **Threshold Conservatism (Zero Runaway False Positives):** Freezing validation thresholds proved safe and conservative: actual test FPRs were **$0.56\%$ to $0.66\%$** at the 1% target, and **$3.60\%$ to $4.01\%$** at the 5% target.
-3. **The GMM $K=4$ Dominance at Tight Budgets:** At Top 50 alerts, $K=4$ captured **$52.00\%$ of all test fraud with $78.00\%$ precision**, intercepting nearly $4\times$ more fraud than the baseline and Autoencoder.
-4. **Baseline Recall at Wide Budgets:** At the 5% FPR operating point, the single-component GMM Baseline captured **$84.00\%$ of frauds (63/75)**, surpassing both $K=4$ (60/75, 80.00%) and the Autoencoder (60/75, 80.00%). Unimodal quadratic distance flags multi-feature outliers without mixture-weight dilution.
+1. **Increase in Average Precision Across Models:** Average precision increased across all models on test data ($0.074 \to 0.161$ for baseline, $0.076 \to 0.179$ for AE, $0.484 \to 0.577$ for $K=4$). The test partition had a higher fraud prevalence (0.1317% vs. 0.1001%, a +31.6% relative increase). While differences in prevalence and the ranking of individual fraud transactions may contribute to the observed change, the available analysis does not establish a causal explanation or confirm formal fraud clustering.
+2. **Threshold Conservatism (Zero Runaway False Positives):** Freezing validation thresholds proved safe and conservative: actual test FPRs were **0.56% to 0.66%** at the 1% target, and **3.60% to 4.01%** at the 5% target.
+3. **The GMM $K=4$ Dominance at Tight Budgets:** At Top 50 alerts, $K=4$ captured **52.00% of all test fraud with 78.00% precision**, intercepting nearly $4\times$ more fraud than the baseline and Autoencoder.
+4. **Baseline Recall at Wide Budgets:** At the 5% FPR operating point, the single-component GMM Baseline captured **84.00% of frauds (63/75)**, surpassing both $K=4$ (60/75, 80.00%) and the Autoencoder (60/75, 80.00%). Unimodal quadratic distance flags multi-feature outliers without mixture-weight dilution.
 
 ---
 
@@ -349,4 +349,4 @@ Verified with command:
 ## 11. Conclusion & Submission Sign-Off
 This project successfully designed, implemented, mathematically audited, and empirically validated a dual-paradigm machine learning framework for credit card fraud triage. By maintaining strict research integrity—fitting exclusively on legitimate transactions, aligning chronological timestamp boundaries, avoiding feature/target leakage, and freezing validation thresholds—the system demonstrated robust generalization on 56,962 unseen test transactions.
 
-The frozen multi-component GMM ($K=4$ full covariance) provides an effective high-precision queue at low review capacities (achieving **$78.00\%$ precision at Top 50 alerts** on this test partition), while the frozen single-component GMM baseline provides robust high recall across broad operational thresholds (delivering **$84.00\%$ total fraud recall** at a conservative $4.01\%$ realized test FPR). The resulting tiered architecture bridges the gap between academic unsupervised anomaly detection and real-world banking operations.
+The frozen multi-component GMM ($K=4$ full covariance) provides an effective high-precision queue at low review capacities (achieving **78.00% precision at Top 50 alerts** on this test partition), while the frozen single-component GMM baseline provides robust high recall across broad operational thresholds (delivering **84.00% total fraud recall** at a conservative 4.01% realized test FPR). The resulting tiered architecture bridges the gap between academic unsupervised anomaly detection and real-world banking operations.

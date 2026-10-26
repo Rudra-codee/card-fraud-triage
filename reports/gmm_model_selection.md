@@ -18,7 +18,7 @@ This report details the systematic model-selection experiment for the Card Fraud
 Every candidate was trained strictly on **legitimate transactions** ($y_{\text{train}} == 0$) from the chronological training partition. We evaluated candidates using a multi-dimensional protocol:
 1. **Unsupervised Density Estimation Quality:** Akaike Information Criterion (AIC) and Bayesian Information Criterion (BIC) on legitimate training transactions.
 2. **Prospective Validation Triage Ranking:** Average Precision (PR-AUC), Recall @ 1% False Positive Rate (FPR), and Recall @ 5% False Positive Rate (FPR) on unseen validation transactions ($N = 56,957$, containing 57 fraud cases).
-3. **Numerical Conditioning & Stability Audit:** Eigenvalue spectra, covariance condition numbers, component weights, and regularization sensitivity across $10^{-6} \le \text{reg\_covar} \le 10^{-1}$.
+3. **Numerical Conditioning & Stability Audit:** Eigenvalue spectra, covariance condition numbers, component weights, and regularization sensitivity across $10^{-6} \le$ `reg_covar` $\le 10^{-1}$.
 4. **Data Hygiene & Test Set Isolation:** Zero test set leakage. Test features and labels were strictly never loaded, evaluated, or referenced.
 
 ---
@@ -45,11 +45,13 @@ All experiments operate on the frozen, leak-free preprocessed data generated in 
 ## 3. Official 12-Model Grid Results & Comparison Table
 
 All 12 candidate models and the baseline reference were trained with standardized hyperparameters:
-$$\text{reg\_covar} = 10^{-6}, \quad n\_\text{init} = 5, \quad \text{random\_state} = 42$$
+* `reg_covar = 1e-6`
+* `n_init = 5`
+* `random_state = 42`
 
-Validation anomaly scores are defined as negative log-likelihood: $\mathrm{Score}(x) = -\ln p(x \mid \hat{\theta}) = -\mathrm{gmm.score\_samples}(X_{\mathrm{val}})$. Higher scores denote higher anomaly severity.
+Validation anomaly scores are defined as negative log-likelihood: $\mathrm{Score}(x) = -\ln p(x \mid \hat{\theta})$ (corresponding to `-gmm.score_samples(X_val)`). Higher scores denote higher anomaly severity.
 
-| Model Identifier | $K$ | Covariance Type | Free Parameters ($p$) | AIC | BIC | Average Precision (PR-AUC) | Recall @ 1% FPR | Recall @ 5% FPR | $\tau_{1\%}$ Threshold | $\tau_{5\%}$ Threshold | Fit Time (s) |
+| Model Identifier | $K$ | Covariance Type | Free Parameters ($p$) | AIC | BIC | Average Precision (PR-AUC) | Recall @ 1% FPR | Recall @ 5% FPR | Threshold ($\tau$ at 1% FPR) | Threshold ($\tau$ at 5% FPR) | Fit Time (s) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | `gmm_baseline_k1_full` | 1 | `full` | 464 | 13,747,068.7 | 13,751,730.4 | 0.0740 | 73.68% (42/57) | 87.72% (50/57) | 158.73 | 60.72 | 1.20 |
 | `gmm_k2_full` | 2 | `full` | 929 | 5,963,565.2 | 5,972,898.6 | 0.0750 | 75.44% (43/57) | **89.47% (51/57)** | 88.69 | 55.42 | 5.73 |

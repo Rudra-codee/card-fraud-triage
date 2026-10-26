@@ -129,7 +129,7 @@ When human fraud investigation capacity is constrained to a fixed daily alert qu
    - GMM Baseline: $0.0740 \to 0.1610$ (+117.6% relative)
    - Autoencoder: $0.0765 \to 0.1793$ (+134.4% relative)
    - GMM $K=4$ Full: $0.4840 \to 0.5770$ (+19.2% relative)  
-   The test partition also had a higher fraud prevalence ($0.1317\%$ vs. $0.1001\%$, a $+31.6\%$ relative increase). While differences in prevalence and the ranking of individual fraud transactions may contribute to the observed change, the available analysis does not establish a causal explanation or confirm formal fraud clustering.
+   The test partition also had a higher fraud prevalence (0.1317% vs. 0.1001%, a +31.6% relative increase). While differences in prevalence and the ranking of individual fraud transactions may contribute to the observed change, the available analysis does not establish a causal explanation or confirm formal fraud clustering.
 
 2. **Operating Point Conservatism:**  
    When validation thresholds were applied to the test partition, the actual test false positive rates were consistently lower than nominal targets:

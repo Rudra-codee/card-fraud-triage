@@ -10,7 +10,7 @@ An academic and research prototype for prioritizing suspicious credit card trans
 1. **Gaussian Mixture Model (GMM) Density Estimation:** Quantifying statistical rarity via negative log-likelihood (NLL).
 2. **Deep Autoencoder Neural Reconstruction:** Quantifying feature abnormality via mean squared reconstruction error (MSE).
 
-The primary objective is **fraud triage**—ranking transactions to optimize analyst review capacity under stringent operational constraints (e.g., $\le 1\%$ false positive rate)—without fitting on fraudulent transactions or snooping into the held-out evaluation partitions.
+The primary objective is **fraud triage**—ranking transactions to optimize analyst review capacity under stringent operational constraints (e.g., $\le 1$% false positive rate)—without fitting on fraudulent transactions or snooping into the held-out evaluation partitions.
 
 ---
 
@@ -308,7 +308,7 @@ Audited from [`models/gmm_baseline_metadata.json`](models/gmm_baseline_metadata.
 To investigate whether modeling multi-modal transaction patterns improves fraud triage, a systematic 12-model grid search was conducted in Phase 1 Task 3 ([`reports/gmm_model_selection.md`](reports/gmm_model_selection.md)):
 * **Component Counts ($K$):** $K \in \{2, 3, 4, 5\}$
 * **Covariance Structures:** `'full'`, `'diag'`, and `'tied'`
-* **Fixed Hyperparameters:** $\text{reg\_covar} = 10^{-6}, n\_\text{init} = 5, \text{random\_state} = 42$
+* **Fixed Hyperparameters:** `reg_covar = 1e-6`, `n_init = 5`, `random_state = 42`
 
 ### 12-Candidate Grid Results
 Evaluated on legitimate training fit (AIC/BIC) and unseen validation transactions ($N = 56,957$, 57 frauds):
@@ -409,7 +409,7 @@ Both models were audited and compared on the **identical validation partition** 
 | **Average Precision (PR-AUC)**| **0.0740** | **0.0765** | AE leads by +0.0025 (+3.4% relative) |
 | **Recall @ 1% FPR** | **73.68% (42 / 57 frauds)** | **71.93% (41 / 57 frauds)** | GMM catches **1 additional fraud** |
 | └ Operating Threshold | 158.814 | 2.651 | Model-specific score threshold |
-| └ Legitimate Flagged (FP) | 566 / 56,900 (`0.995%`) | 569 / 56,900 (`1.000%`) | Both strictly satisfy $\le 1.0\%$ FPR |
+| └ Legitimate Flagged (FP) | 566 / 56,900 (`0.995%`) | 569 / 56,900 (`1.000%`) | Both strictly satisfy $\le 1.0$% FPR |
 | **Recall @ 5% FPR** | **87.72% (50 / 57 frauds)** | **87.72% (50 / 57 frauds)** | **Identical recall (50 / 57 frauds caught)** |
 | └ Operating Threshold | 60.726 | 1.341 | Model-specific score threshold |
 | └ Legitimate Flagged (FP) | 2,845 / 56,900 (`5.000%`) | 2,845 / 56,900 (`5.000%`) | Exactly 2,845 false positives flagged |
@@ -442,16 +442,16 @@ Scores are stored with their `row_id`. In evaluation, rows are joined back to gr
 
 ## 11. Final Held-Out Test Evaluation Results
 
-The final, unbiased evaluation was executed on the chronological held-out test partition ($N = 56,962$ transactions, $75$ fraud cases, $0.1317\%$ fraud prevalence) using the frozen model artifacts and frozen validation-derived thresholds. Full documentation and diagnostics are available in [`reports/final_test_evaluation.md`](reports/final_test_evaluation.md).
+The final, unbiased evaluation was executed on the chronological held-out test partition ($N = 56,962$ transactions, $75$ fraud cases, 0.1317% fraud prevalence) using the frozen model artifacts and frozen validation-derived thresholds. Full documentation and diagnostics are available in [`reports/final_test_evaluation.md`](reports/final_test_evaluation.md).
 
 ### 11.1 Methodological Rigor & Threshold Provenance
 * **Zero Test Retraining:** Preprocessing parameters (`StandardScaler`) and model parameters were frozen.
-* **Frozen Threshold Rule:** Operating thresholds were selected strictly on the validation partition to meet $1\%$ and $5\%$ FPR targets, then applied directly to test anomaly scores. **No threshold tuning was performed on test labels.**
+* **Frozen Threshold Rule:** Operating thresholds were selected strictly on the validation partition to meet 1% and 5% FPR targets, then applied directly to test anomaly scores. **No threshold tuning was performed on test labels.**
 * **Decoupled Scoring:** Anomaly scores were generated from $X_{\text{test}}$ alone without access to target labels.
 * **Verified Threshold Values:**
-  * **GMM Baseline:** $1\%$ FPR threshold = `158.814`, $5\%$ FPR threshold = `60.726` (NLL units).
-  * **GMM $K=4$ Full:** $1\%$ FPR threshold = `66.436`, $5\%$ FPR threshold = `50.241` (NLL units).
-  * **Autoencoder Baseline:** $1\%$ FPR threshold = `2.651`, $5\%$ FPR threshold = `1.341` (MSE units).
+  * **GMM Baseline:** 1% FPR threshold = `158.814`, 5% FPR threshold = `60.726` (NLL units).
+  * **GMM $K=4$ Full:** 1% FPR threshold = `66.436`, 5% FPR threshold = `50.241` (NLL units).
+  * **Autoencoder Baseline:** 1% FPR threshold = `2.651`, 5% FPR threshold = `1.341` (MSE units).
 
 ### 11.2 Comprehensive Model Comparison on Held-Out Test Partition
 

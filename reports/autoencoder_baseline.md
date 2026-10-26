@@ -15,7 +15,7 @@ This report establishes the baseline Autoencoder anomaly detection model for the
 The Autoencoder was trained strictly on **legitimate transactions** (`Class == 0`) from the chronological training partition using mini-batch Adam optimization on CPU. Early stopping and best checkpoint selection were monitored exclusively on **legitimate validation transactions** (`y_val == 0`). Zero fraudulent transactions were ever exposed during gradient updates, threshold derivations, or epoch selection.
 
 Anomaly scores are quantified as the per-transaction **Mean Squared Reconstruction Error (MSE)** across all 29 features:
-$$\text{anomaly\_score}(x) = \frac{1}{29}\sum_{d=1}^{29}(x_d - \hat{x}_d)^2$$
+$$\mathrm{Score}_{\mathrm{AE}}(x) = \frac{1}{29}\sum_{d=1}^{29}(x_d - \hat{x}_d)^2$$
 
 Higher reconstruction error indicates that an incoming transaction deviates from the normal spending manifold learned by the autoencoder, marking it as a higher-priority triage alert.
 
@@ -90,17 +90,17 @@ Anomaly scores represent per-sample Mean Squared Reconstruction Error:
 
 All metrics were calculated using the project's established evaluation module (`src/triage_evaluation.py`) on the **identical 56,957 validation transactions** joined strictly by `row_id`:
 
-* **Threshold Selection Rule:** Operational thresholds are selected using `roc_curve(drop_intermediate=False)` by taking the lowest threshold that guarantees the empirical false positive rate on legitimate validation transactions stays strictly $\le \text{max\_fpr}$.
-  * At 1% FPR, the threshold is $\tau_{1\%} = 2.651144$ (flagging exactly 569 false positives out of 56,900 legitimate transactions, exactly 1.000% FPR).
-  * At 5% FPR, the threshold is $\tau_{5\%} = 1.341100$ (flagging exactly 2,845 false positives out of 56,900 legitimate transactions, exactly 5.000% FPR).
+* **Threshold Selection Rule:** Operational thresholds are selected using `roc_curve(drop_intermediate=False)` by taking the lowest threshold that guarantees the empirical false positive rate on legitimate validation transactions stays strictly <= `max_fpr`.
+  * At 1% FPR, the threshold is $\tau$ (1% FPR) = 2.651144 (flagging exactly 569 false positives out of 56,900 legitimate transactions, exactly 1.000% FPR).
+  * At 5% FPR, the threshold is $\tau$ (5% FPR) = 1.341100 (flagging exactly 2,845 false positives out of 56,900 legitimate transactions, exactly 5.000% FPR).
 
 ### Head-to-Head Comparison:
 | Metric | Frozen GMM Baseline (`gmm_baseline_k1_full`) | Autoencoder Baseline (`autoencoder_baseline`) | Relative Difference |
 | :--- | :--- | :--- | :--- |
 | **Model Type** | Probabilistic Density Estimation (GMM) | Neural Representation Learning (Autoencoder) | — |
 | **Scoring Formula** | Negative Log-Likelihood: $-\ln p(x)$ | MSE Reconstruction: $\frac{1}{29}\|x - \hat{x}\|^2$ | — |
-| **Trainable Parameters** | 464 (means + full covariance) | 1,929 (weights + biases) | $+315\%$ parameters |
-| **PR-AUC (Average Precision)** | **0.0740** | **0.0765** | **$+3.38\%$ relative improvement** |
+| **Trainable Parameters** | 464 (means + full covariance) | 1,929 (weights + biases) | +315% parameters |
+| **PR-AUC (Average Precision)** | **0.0740** | **0.0765** | **+3.38% relative improvement** |
 | **Recall @ 1% FPR** | **73.68% (42 / 57 frauds)** | **71.93% (41 / 57 frauds)** | $-1$ fraud caught at 1% FPR |
 | **Recall @ 5% FPR** | **87.72% (50 / 57 frauds)** | **87.72% (50 / 57 frauds)** | Identical (50/57 frauds caught) |
 | **Training Duration** | ~1.20s | ~10.24s | — |

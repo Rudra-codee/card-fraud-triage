@@ -54,7 +54,8 @@ GaussianMixture(
 
 Anomaly scores are mathematically defined as the negative log-likelihood under the fitted GMM probability density function:
 
-$$\text{anomaly\_score}(x) = -\ln p(x \mid \hat{\mu}, \hat{\Sigma}) = -\text{gmm.score\_samples}(x)$$
+$$\mathrm{Score}_{\mathrm{GMM}}(x) = -\ln p(x \mid \hat{\mu}, \hat{\Sigma})$$
+(corresponding to `-gmm.score_samples(x)`).
 
 ### Interpretation:
 * **Higher scores** denote transactions that have lower probability density under the learned legitimate distribution, flagging them as potential anomalies / triage candidates.
