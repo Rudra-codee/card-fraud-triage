@@ -1,349 +1,484 @@
 # Card Fraud Triage via Gaussian Mixture Density Scoring and Autoencoder Anomaly Detection
 
-[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.14 / 3.10+](https://img.shields.io/badge/python-3.14%20%7C%203.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![scikit-learn 1.9.1](https://img.shields.io/badge/scikit--learn-1.9.1-orange.svg)](https://scikit-learn.org/)
-[![Status: Baseline Frozen](https://img.shields.io/badge/Phase%201-GMM%20Baseline%20Frozen-success.svg)](#current-milestone-status)
-[![Unit Tests: 11 Passing](https://img.shields.io/badge/tests-11%2F11%20passing-brightgreen.svg)](#6-verification-and-test-results)
+[![PyTorch 2.14.1](https://img.shields.io/badge/PyTorch-2.14.1-red.svg)](https://pytorch.org/)
+[![Status: Validation Comparison Audited](https://img.shields.io/badge/Phase%202-Validation%20Comparison%20Audited-success.svg)](#2-current-milestone-project-status)
+[![Unit Tests: 48 Passing](https://img.shields.io/badge/tests-48%2F48%20passing-brightgreen.svg)](#11-verification-and-automated-test-results)
 
-An academic and research prototype for prioritizing suspicious credit card transactions using semi-supervised / unsupervised anomaly detection. Normal transaction behavior is modeled using density estimation on legitimate transactions, generating negative log-likelihood triage scores without fitting on fraudulent transactions or snooping into evaluation sets.
+An academic and research prototype for prioritizing suspicious credit card transactions using semi-supervised / unsupervised anomaly detection. Normal transaction behavior is modeled strictly on legitimate transactions using two distinct paradigms:
+1. **Gaussian Mixture Model (GMM) Density Estimation:** Quantifying statistical rarity via negative log-likelihood (NLL).
+2. **Deep Autoencoder Neural Reconstruction:** Quantifying feature abnormality via mean squared reconstruction error (MSE).
 
----
-
-## Current Milestone Status
-
-* **Completed:** Dataset verification, exploratory data analysis, chronological train/validation/test splitting (Strategy B: Timestamp Boundary Alignment), leak-free preprocessing, GMM baseline implementation (\(K=1\), full covariance), negative log-likelihood scoring, automated unit testing (11/11 passing), numerical stability audit, and baseline freeze.
-* **Current Stage:** **Phase 1 — GMM Baseline Frozen and Handed Off.**
-* **Next Stage:** **Phase 1 — Model Selection (Member 3):** Component tuning (\(K \in \{2, 3, 4, 5\}\)), covariance structures (`full`, `diag`, `tied`), AIC/BIC analysis, and validation evaluation.
-* **Disclaimer:** *This repository contains a research prototype for decision-support triage. It is not a production-deployed payment security system and does not claim commercial fraud-detection effectiveness.*
+The primary objective is **fraud triage**—ranking transactions to optimize analyst review capacity under stringent operational constraints (e.g., $\le 1\%$ false positive rate)—without fitting on fraudulent transactions or snooping into the held-out evaluation partitions.
 
 ---
 
 ## Table of Contents
 
-1. [Project Overview](#1-project-overview)
-2. [Dataset Specification](#2-dataset-specification)
-3. [Data Verification and Preprocessing](#3-data-verification-and-preprocessing)
-4. [Repository Architecture](#4-repository-architecture)
-5. [GMM Baseline Implementation](#5-gmm-baseline-implementation)
-6. [Anomaly Scoring Pipeline](#6-anomaly-scoring-pipeline)
-7. [Verification and Test Results](#7-verification-and-test-results)
-8. [Setup and Reproducibility](#8-setup-and-reproducibility)
-9. [Current Results and Limitations](#9-current-results-and-limitations)
-10. [Team Responsibilities](#10-team-responsibilities)
-11. [Project Roadmap](#11-project-roadmap)
+1. [Project Overview & Scope](#1-project-overview-scope)
+2. [Current Milestone & Project Status](#2-current-milestone-project-status)
+3. [Dataset Specification](#3-dataset-specification)
+4. [Data Verification and Leak-Free Preprocessing](#4-data-verification-and-leak-free-preprocessing)
+5. [Repository Architecture](#5-repository-architecture)
+6. [Frozen GMM Baseline Implementation](#6-frozen-gmm-baseline-implementation)
+7. [GMM Model Selection Experiments](#7-gmm-model-selection-experiments)
+8. [Deep Autoencoder Anomaly Detection](#8-deep-autoencoder-anomaly-detection)
+9. [GMM Baseline vs. Autoencoder Validation Comparison](#9-gmm-baseline-vs-autoencoder-validation-comparison)
+10. [Anomaly Scoring, Triage Evaluation & Operating Points](#10-anomaly-scoring-triage-evaluation-operating-points)
+11. [Verification and Automated Test Results](#11-verification-and-automated-test-results)
+12. [Setup and Reproducibility](#12-setup-and-reproducibility)
+13. [Limitations & Research Integrity](#13-limitations-research-integrity)
+14. [Team Responsibilities](#14-team-responsibilities)
+15. [Project Roadmap & Completion Checklist](#15-project-roadmap-completion-checklist)
 
 ---
 
-## 1. Project Overview
+## 1. Project Overview & Scope
 
 ### The Problem
-Credit card fraud detection is characterized by **extreme class imbalance** (typically <0.2% of transactions are fraudulent) and **non-stationary fraud patterns**. In financial operations, human fraud analysts face alert fatigue from high false-positive rates. A fraud triage system must rank incoming transactions by anomaly severity to surface the most suspicious transactions for human review.
+Credit card fraud detection is characterized by **extreme class imbalance** (<0.2% fraud prevalence) and **non-stationary, adversarial fraud evolution**. In commercial fraud operations, human investigation teams experience severe alert fatigue from high false-positive volumes. A fraud triage system must reliably rank incoming transactions by anomaly severity to surface the highest-risk events within a limited analyst review budget.
 
 ### The Modeling Principle
-Traditional supervised classifiers can overfit to observed fraud patterns and fail to detect novel attack mechanisms. Our triage approach models the probability density distribution of **normal customer spending behavior**:
+Supervised classification models can overfit to historical fraud topologies and struggle to identify novel fraud mechanisms. Our triage framework models the distribution of **normal cardholder spending behavior**:
 
-1. Fit density estimators strictly on **legitimate transactions** from the training partition (`Class == 0`).
-2. Evaluate unseen transactions against the learned legitimate distribution.
-3. Quantify anomaly severity using **negative log-likelihood (NLL)**:
-
-\[
-\mathrm{Score}(x) = -\ln p(x \mid \hat{\theta}_{\mathrm{GMM}})
-\]
-
-In code, this is directly computed using the model's sample likelihood:
-```python
-anomaly_score = -gmm.score_samples(X)
-```
-
-### Interpretation
-* **Higher scores** denote transactions that are improbable under the learned normal spending profile, marking them as higher priority for triage.
-* **Lower scores** represent high-density normal behavior.
-* **Important Caveat:** A high anomaly score is an indicator of statistical rarity under the model, **not definitive proof of fraud**. High-value legitimate transactions, unusual international spending, or rare merchant categories can also produce high anomaly scores.
+1. Fit estimators strictly on **legitimate transactions** from the training partition (`Class == 0`).
+2. Evaluate unseen transactions against the learned legitimate representation.
+3. Score anomaly severity:
+   * **GMM:** Negative log-likelihood (NLL), $-\ln p(x \mid \hat{\theta}_{\mathrm{GMM}})$.
+   * **Autoencoder:** Per-sample Mean Squared Error (MSE), $\frac{1}{D} \sum_{j=1}^D (x_j - \hat{x}_j)^2$.
 
 ```
-+---------------------------------------------------------------------------------------+
-|                                DATA FLOW & TRIAGE PIPELINE                            |
-+---------------------------------------------------------------------------------------+
-|                                                                                       |
-|   Raw Data (creditcard.csv)                                                           |
-|       │                                                                               |
-|       ▼                                                                               |
-|   Chronological Split (60% Train / 20% Val / 20% Test) ──► split_manifest.csv         |
-|       │                                                                               |
-|       ▼                                                                               |
-|   Amount Log-Transform: np.log1p(Amount)                                              |
-|       │                                                                               |
-|       ▼                                                                               |
-|   StandardScaler (Fitted ONLY on Train Legit: Class == 0, N = 170,528)                |
-|       │                                                                               |
-|       ▼                                                                               |
-|   Processed Arrays (X_train, X_val, X_test) [29 features: V1–V28 + log1p(Amount)]     |
-|       │                                                                               |
-|       ├─────────────────────────────────┐                                             |
-|       ▼ (y_train == 0 ONLY)             ▼ (All Rows: Diagnostics / Validation)        |
-|   GaussianMixture (K=1, full cov)   compute_anomaly_scores: -gmm.score_samples(X)     |
-|       │                                 │                                             |
-|       ▼                                 ▼                                             |
-|   models/gmm_baseline.joblib        data/processed/scores/gmm_baseline_scores_*.csv   |
-|                                                                                       |
-+---------------------------------------------------------------------------------------+
++---------------------------------------------------------------------------------------------------+
+|                                 DUAL-MODEL TRIAGE DATA FLOW                                       |
++---------------------------------------------------------------------------------------------------+
+|                                                                                                   |
+|   Raw Data (data/raw/creditcard.csv) [284,807 rows]                                               |
+|       │                                                                                           |
+|       ▼                                                                                           |
+|   Chronological Split (Strategy B: Timestamp Boundary Alignment) ──► split_manifest.csv           |
+|       ├─ Train Split (60%): 170,888 rows (170,528 legit, 360 fraud)                              |
+|       ├─ Val Split   (20%):  56,957 rows ( 56,900 legit,  57 fraud)                              |
+|       └─ Test Split  (20%):  56,962 rows ( 56,887 legit,  75 fraud) [HELD-OUT & UNTOUCHED]        |
+|       │                                                                                           |
+|       ▼                                                                                           |
+|   Feature Engineering & Scaling:                                                                  |
+|       • Amount Compression: np.log1p(Amount)                                                      |
+|       • StandardScaler fitted strictly on Train Legit (Class == 0, N = 170,528)                   |
+|       • 29 Features: V1–V28 + transformed Amount (Time, Class, row_id excluded)                   |
+|       │                                                                                           |
+|       ├───────────────────────────────────────────┬───────────────────────────────────────────┤   |
+|       ▼                                           ▼                                           |   |
+|   PARADIGM 1: Density Estimation              PARADIGM 2: Neural Reconstruction               |   |
+|   Gaussian Mixture Models (GMM)               Deep Autoencoder (PyTorch)                      |   |
+|   • Baseline: K=1, full covariance            • Architecture: 29→20→10→5→10→20→29             |   |
+|   • Candidates: K∈{2,3,4,5}, full/diag/tied   • Trained strictly on Train Legit (N=170,528)   |   |
+|   • Score: -ln p(x | θ)                       • Val Legit early stopping (N=56,900)           |   |
+|       │                                       • Score: mean((x - x̂)²)                         |   |
+|       ▼                                           │                                           |   |
+|   data/processed/scores/gmm_baseline_*.csv        ▼                                           |   |
+|                                               data/processed/scores/autoencoder_*.csv         |   |
+|       │                                           │                                           |   |
+|       └─────────────────────┬─────────────────────┘                                           |   |
+|                             ▼                                                                 |   |
+|   Validation Triage Evaluation & Model Comparison (src/triage_evaluation.py)                  |   |
+|   • Average Precision (PR-AUC), Recall @ 1% FPR, Recall @ 5% FPR, Top-N Alert Capacity       |   |
+|   • reports/gmm_vs_autoencoder.md & reports/triage_evaluation.md                              |   |
+|                                                                                                   |
++---------------------------------------------------------------------------------------------------+
 ```
+
+### Scope & Decision Support Distinction
+* **Ranking, Not Classification:** The goal is prioritizing transactions for analyst investigation, not declaring that every high-scoring transaction is fraud.
+* **Evaluation Independence:** Models are fitted on legitimate training data only; candidate operating thresholds are estimated on the validation partition only; the held-out test partition remains strictly untouched.
+* **Academic Research Prototype:** This repository is an academic coursework implementation. It is not a commercial, production-deployed payment security system and does not claim production latency or operational guarantees.
 
 ---
 
-## 2. Dataset Specification
+## 2. Current Milestone & Project Status
 
-All data specifications are verified against the raw dataset and split manifest:
+### Executive Summary
 
-* **Source Context:** Credit card transactions made by European cardholders in September 2013 over a two-day period (48 hours).
+| Category | Status | Summary |
+| :--- | :---: | :--- |
+| **Data Hygiene & Preprocessing** | **Completed** | Chronological 60/20/20 partitioning (Strategy B), `log1p(Amount)` compression, leak-free `StandardScaler` fitted solely on legitimate training data. |
+| **GMM Baseline Model** | **Completed & Frozen** | 1-component full-covariance model fitted on 170,528 legitimate training rows; condition number $\kappa=6.475$; negative log-likelihood scores exported. |
+| **GMM Model Selection** | **Completed** | 12 candidate grid ($K \in \{2, 3, 4, 5\}$, `full`, `diag`, `tied`), AIC/BIC analysis, seed sensitivity analysis, and candidate serialization. |
+| **Triage Evaluation Framework** | **Completed** | Reusable validation evaluation module (`src/triage_evaluation.py`) with Recall@FPR, Average Precision, and Top-N review-capacity analysis. |
+| **Autoencoder Model** | **Completed** | PyTorch symmetric autoencoder ($29 \to 20 \to 10 \to 5 \to 10 \to 20 \to 29$) trained on legitimate training data with legitimate validation monitoring. |
+| **Cross-Model Comparison** | **Completed & Audited** | Direct validation comparison between GMM baseline and Autoencoder baseline documented in [`reports/gmm_vs_autoencoder.md`](reports/gmm_vs_autoencoder.md). |
+| **Automated Test Suite** | **48 / 48 Passing** | Full unit test suite passing in restored `.venv` (`.venv/bin/python -m unittest discover tests`). |
+| **Final Test Set Evaluation** | **HELD OUT** | The 56,962-row test partition has **never been evaluated or accessed**. Preserved for final one-time benchmarking. |
+| **Presentation & Final Viva** | **Pending Confirmation** | Final report consolidation and presentation slide deck in preparation. |
+
+---
+
+## 3. Dataset Specification
+
+Verified against the raw dataset and split manifest:
+
+* **Source:** European cardholder credit card transactions (September 2013, 48-hour window).
 * **Total Transactions:** `284,807` records.
-* **Total Fraud Cases:** `492` verified fraudulent transactions (`0.1727%` class balance).
-* **Total Legitimate Cases:** `284,315` transactions (`99.8273%`).
-* **Original Columns (31 total):**
-  * `Time`: Seconds elapsed between each transaction and the first transaction in the dataset (range: 0.0s to 172,792.0s).
-  * `V1` through `V28`: 28 principal components obtained via Principal Component Analysis (PCA) to protect cardholder privacy.
-  * `Amount`: Transaction value in Euros (range: €0.00 to €25,691.16).
-  * `Class`: Ground-truth binary target (`0` = legitimate, `1` = fraudulent).
-* **Storage Location:** `data/raw/creditcard.csv` (150,828,752 bytes).
-* **Git LFS Requirement:** The raw CSV is tracked via Git Large File Storage (`git-lfs`). When cloning the repository, execute `git lfs pull` to populate the raw CSV if it appears as a 134-byte pointer file.
+* **Fraud Distribution:** `492` fraud transactions (`0.1727%` prevalence) and `284,315` legitimate transactions (`99.8273%`).
+* **Original Features (31 columns):**
+  * `Time`: Seconds elapsed from first transaction (`0.0s` to `172,792.0s`).
+  * `V1`–`V28`: PCA-transformed numerical features preserving confidentiality.
+  * `Amount`: Transaction value in Euros (`€0.00` to `€25,691.16`).
+  * `Class`: Target ground truth (`0` = legitimate, `1` = fraud).
+* **Location:** `data/raw/creditcard.csv` (150.8 MB).
+* **Git LFS Requirement:** Managed via Git Large File Storage (`.gitattributes`). Run `git lfs pull` after cloning if the file appears as a pointer.
+
+### Chronological Partitioning (Strategy B: Timestamp Boundary Alignment)
+Random splits cause future-to-past data leakage. We implement a strict chronological split:
+
+| Partition | Total Rows | Legitimate (`Class == 0`) | Fraud (`Class == 1`) | Fraud Rate | Time Window (s) | Model Usage |
+| :--- | ---: | ---: | ---: | ---: | :--- | :--- |
+| **Train** | **170,888** | **170,528** | **360** | 0.2107% | 0.0s – 120,396.0s (~33.4h) | **Legitimate rows ONLY** used for parameter fitting |
+| **Validation** | **56,957** | **56,900** | **57** | 0.1001% | 120,397.0s – 145,247.0s (~6.9h) | Early stopping & triage threshold evaluation |
+| **Test** | **56,962** | **56,887** | **75** | 0.1317% | 145,248.0s – 172,792.0s (~7.6h) | **HELD OUT — UNTOUCHED** |
+| **Total** | **284,807** | **284,315** | **492** | 0.1727% | 0.0s – 172,792.0s (48.0h) | Full dataset preserved |
+
+* **Boundary Alignment:** The nominal 60% index boundary fell within a 1-second burst sharing `Time = 120,396.0s`. The boundary was shifted by 4 rows to index 170,888 to ensure all simultaneous transactions remained in the training split.
+* **Traceability:** Mapped immutably in [`data/splits/split_manifest.csv`](data/splits/split_manifest.csv) with unique, 0-indexed `row_id` values.
 
 ---
 
-## 3. Data Verification and Preprocessing
+## 4. Data Verification and Leak-Free Preprocessing
 
-The preprocessing pipeline ([`src/preprocessing.py`](src/preprocessing.py)) implements rigorous data hygiene to prevent leakage:
+The preprocessing pipeline ([`src/preprocessing.py`](src/preprocessing.py)) enforces rigorous data hygiene:
 
-### 1. Chronological Partitioning (Strategy B)
-Transactions arrive sequentially in time. Random train/test splits cause time-travel data leakage (training on future patterns to predict past transactions). We implement **Strategy B: Chronological Split with Timestamp Boundary Alignment**:
-
-* **Train Partition (60%):** Sorted indices `0` to `170,887` (0.0s to 120,396.0s, ~33.44 hrs).
-  * *Boundary Adjustment:* The nominal 60% integer cutoff (170,884) fell in the middle of a single second where 6 distinct transactions shared `Time = 120,396.0s`. The boundary was shifted by 4 rows to index 170,888 so that all 6 transactions remain together in the training partition.
-* **Validation Partition (20%):** Sorted indices `170,888` to `227,844` (120,397.0s to 145,247.0s, ~6.90 hrs).
-* **Test Partition (20%):** Sorted indices `227,845` to `284,806` (145,248.0s to 172,792.0s, ~7.65 hrs).
-* **Chronological Monotonicity:** \(\max(\mathrm{Time}_{\mathrm{train}}) = 120{,}396.0\,\mathrm{s} < \min(\mathrm{Time}_{\mathrm{val}}) = 120{,}397.0\,\mathrm{s} < \min(\mathrm{Time}_{\mathrm{test}}) = 145{,}248.0\,\mathrm{s}\).
-* **Zero Duplicate Leakage:** All 773 identical duplicate transaction clusters occur strictly within a single partition; zero duplicate groups cross split boundaries.
-* **Split Manifest:** Saved at `data/splits/split_manifest.csv` (`row_id`, `split`) to preserve immutability without duplicating raw files.
-
-### 2. Confirmed Partition Dimensions
-| Partition | Total Rows | Legitimate (`Class == 0`) | Fraud (`Class == 1`) | Fraud Rate | Split % | Model Fitting Usage |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Train** | **170,888** | **170,528** | **360** | 0.2107% | 60.001% | **170,528 legit rows ONLY** |
-| **Validation** | **56,957** | **56,900** | **57** | 0.1001% | 19.998% | **Unused for fitting** (evaluation only) |
-| **Test** | **56,962** | **56,887** | **75** | 0.1317% | 20.000% | **Unused for fitting** (frozen benchmark) |
-| **Total** | **284,807** | **284,315** | **492** | 0.1727% | 100.000% | Preserves all 492 fraud cases |
-
-### 3. Feature Selection & Transformation
-* **Baseline Feature Count:** Exactly **29 model features** (`V1` through `V28` + `Amount`).
-* **Amount Compression:** Applied `np.log1p(Amount.astype(float))` to compress extreme right-skew (kurtosis reduced from 700+ to near-normal bounds). Zero-dollar verification pings map safely to \(\ln(1+0) = 0\). The feature name remains `"Amount"` in metadata.
-* **Excluded Columns:** `Time` (non-stationary temporal index), `Class` (target label), and `row_id` (tracking index) are strictly excluded from feature arrays.
-* **Leak-Free StandardScaler:** Fitted **strictly on the 170,528 legitimate training rows** (`y_train == 0`). Fraud patterns, validation data, and test data were never exposed to the scaler.
-  * Verified centering: \(\mathrm{mean}(X_{\mathrm{train, legit}}) \approx 0.0\) (max abs error \(5.51 \times 10^{-15}\)).
-  * Verified variance: \(\mathrm{var}(X_{\mathrm{train, legit}}) \approx 1.0\) (range \([0.99999999999997, 1.00000000000011]\)).
-* **Row-ID Traceability:** Every preprocessed split retains its original 0-indexed row number in `row_ids_train.npy`, `row_ids_val.npy`, and `row_ids_test.npy`.
+1. **Feature Selection (29 Model Features):**
+   * Features: `V1` through `V28` plus transformed `Amount`.
+   * In metadata ([`data/processed/feature_names.json`](data/processed/feature_names.json)), the transformed amount feature is labeled `"Amount"`.
+   * Strict exclusions: `Time` (non-stationary temporal index), `Class` (target label), and `row_id` (record tracker) are never passed to model features.
+2. **Amount Transformation:**
+   * Compressed via $x' = \ln(1 + x)$ (`np.log1p(Amount.astype(float))`), reducing kurtosis from 700+ to near-normal bounds while mapping zero amounts safely to $\ln(1+0) = 0$.
+3. **Leak-Free StandardScaler:**
+   * Fitted strictly on the **170,528 legitimate training rows** (`y_train == 0`).
+   * Scaler centering: $\mathrm{mean}(X_{\mathrm{train, legit}}) \approx 0.0$ (max error $5.51 \times 10^{-15}$).
+   * Scaler variance: $\mathrm{var}(X_{\mathrm{train, legit}}) \approx 1.0$.
+   * Frozen scaler saved at [`data/processed/scaler.joblib`](data/processed/scaler.joblib) and applied without refitting to validation and test features.
+4. **Legitimate-Only Fitting Principle:**
+   * Fraud labels are used strictly for post-hoc validation triage evaluation.
+   * For the Autoencoder, early stopping monitors reconstruction loss solely on the **56,900 legitimate validation transactions** (`y_val == 0`).
 
 ---
 
-## 4. Repository Architecture
+## 5. Repository Architecture
 
 ```text
-card-fraud-triage-main/
-├── .gitattributes                           # Git LFS specification for data/raw/creditcard.csv
-├── .gitignore                              # Excludes .venv/, caches, temporary figures
-├── requirements.txt                        # Pinned dependencies (scikit-learn==1.9.1, numpy==2.5.3)
+card-fraud-triage/
+├── .gitattributes                           # Git LFS tracking for data/raw/creditcard.csv
+├── .gitignore                              # Ignores .venv/, caches, temporary scratch files
+├── requirements.txt                        # 114 pinned dependencies (scikit-learn==1.9.1, torch==2.14.1)
 ├── README.md                               # Comprehensive project documentation
 │
 ├── data/
 │   ├── raw/
 │   │   └── creditcard.csv                  # Raw Kaggle European cardholders dataset (150.8 MB)
 │   ├── splits/
-│   │   └── split_manifest.csv              # 284,807-row chronological split map (row_id, split)
+│   │   └── split_manifest.csv              # 284,807-row chronological split manifest (row_id, split)
 │   └── processed/
-│       ├── X_train.npy, X_val.npy, X_test.npy # Scaled 29-dimensional feature matrices
-│       ├── y_train.npy, y_val.npy, y_test.npy # Target labels (0 = legit, 1 = fraud)
-│       ├── row_ids_train.npy, ...          # Row-ID traceability tracking arrays
-│       ├── scaler.joblib                   # StandardScaler fitted strictly on Class == 0 train rows
-│       ├── feature_names.json              # List of 29 model feature names
-│       ├── preprocessing_metadata.json     # Preprocessing configuration and sample counts
+│       ├── X_train.npy, X_val.npy, X_test.npy # Scaled 29-dimensional feature arrays
+│       ├── y_train.npy, y_val.npy, y_test.npy # Binary labels (0 = legit, 1 = fraud)
+│       ├── row_ids_train.npy, ...          # Deterministic row-ID tracking arrays
+│       ├── scaler.joblib                   # StandardScaler fitted on legitimate train rows only
+│       ├── feature_names.json              # List of 29 feature names (V1-V28, Amount)
+│       ├── preprocessing_metadata.json     # Split and transformation metadata
 │       └── scores/
 │           ├── gmm_baseline_scores_train.csv # 170,888 train scores (row_id, anomaly_score, split)
 │           ├── gmm_baseline_scores_val.csv   # 56,957 val scores (row_id, anomaly_score, split)
-│           └── gmm_baseline_scores_metadata.json # Baseline score summary statistics
+│           ├── gmm_baseline_scores_metadata.json # GMM score distribution statistics
+│           ├── autoencoder_scores_train.csv  # 170,888 train reconstruction error scores
+│           └── autoencoder_scores_val.csv    # 56,957 val reconstruction error scores
 │
 ├── models/
-│   ├── gmm_baseline.joblib                 # Serialized fitted 1-component GMM (21.5 KB)
-│   └── gmm_baseline_metadata.json          # GMM configuration, convergence, and sample metadata
+│   ├── gmm_baseline.joblib                 # Frozen 1-component full-covariance GMM (21.5 KB)
+│   ├── gmm_baseline_metadata.json          # GMM configuration, convergence, and fit diagnostics
+│   ├── autoencoder_baseline.pt             # Best Autoencoder checkpoint weights (epoch 30)
+│   ├── autoencoder_baseline_metadata.json  # Autoencoder loss history, config, sample counts
+│   └── candidates/                         # 12 serialized GMM candidate models and metadata
+│       ├── gmm_k2_full.joblib, ...         # Multi-component GMM candidates (K=2..5, full/diag/tied)
+│       └── gmm_k4_full.joblib              # Primary multi-component candidate
 │
 ├── notebooks/
-│   ├── 01_dataset_verification_eda.ipynb   # Raw data audit, distributions, outlier analysis
-│   ├── 02_preprocessing.ipynb              # Pipeline execution, scaling, and output validation
-│   └── 03_gmm_model_selection.ipynb        # Data verification, GMM baseline training & audit
+│   ├── 01_dataset_verification_eda.ipynb   # Raw data audit and exploratory distribution analysis
+│   ├── 02_preprocessing.ipynb              # Pipeline execution, scaling, and validation checks
+│   ├── 03_gmm_model_selection.ipynb        # Initial GMM baseline training and numerical audit
+│   └── 04_gmm_model_selection_experiments.ipynb # 12-model grid search, AIC/BIC, and triage plots
 │
 ├── reports/
-│   ├── data_cleaning_decisions.md          # Policy: retain duplicates to protect 19 fraud cases
+│   ├── data_cleaning_decisions.md          # Policy documenting retention of duplicate rows
 │   ├── split_strategy.md                   # Chronological 60/20/20 Strategy B boundary details
-│   └── gmm_baseline.md                     # GMM baseline freeze, stability audit, and handoff
+│   ├── gmm_baseline.md                     # Baseline freeze, numerical stability, and handoff
+│   ├── gmm_model_selection.md              # 12-model GMM grid, AIC/BIC analysis, seed audit
+│   ├── triage_evaluation.md                # Validation triage metrics, FPR thresholds, review budgets
+│   ├── autoencoder_baseline.md             # Autoencoder training, architecture, and score audit
+│   └── gmm_vs_autoencoder.md               # Cross-model validation comparison and trade-offs
+│
+├── results/
+│   ├── figures/
+│   │   └── triage_precision_recall_curve.png # Precision-recall curves across evaluated models
+│   └── tables/
+│       ├── triage_model_comparison.csv     # Model comparison across AP, Recall@FPR, precision
+│       ├── triage_fpr_thresholds.csv       # FPR-constrained threshold operating points
+│       ├── triage_review_capacity.csv      # Top-N review budget operating points
+│       ├── triage_stability_check.csv      # Seed and regularization sensitivity evaluation
+│       └── triage_validation_checks.json   # Automated integrity and validation check outputs
+│
+├── scripts/
+│   ├── audit_stability.py                  # Numerical stability and condition number audit
+│   ├── generate_notebook.py                # Notebook generation utility
+│   ├── run_model_selection.py              # Executes 12-candidate GMM grid search and exports models
+│   ├── run_triage_evaluation.py            # Executes validation triage evaluation suite
+│   └── run_autoencoder.py                  # Trains Autoencoder, exports scores, logs metadata
 │
 ├── src/
-│   ├── create_split.py                     # Deterministic chronological split manifest generator
+│   ├── create_split.py                     # Deterministic chronological split generator
 │   ├── preprocessing.py                    # Reusable leak-free preprocessing and data loader
 │   ├── gmm_model.py                        # GMM baseline configuration, fitting, and persistence
-│   └── scoring.py                          # Negative log-likelihood scoring and score export
+│   ├── scoring.py                          # Negative log-likelihood scoring and CSV export
+│   ├── model_selection.py                  # GMM grid training, AIC/BIC, candidate evaluation
+│   ├── triage_evaluation.py                # Reusable validation metrics, FPR thresholds, AP
+│   ├── autoencoder_model.py                # PyTorch Autoencoder architecture and training loop
+│   └── autoencoder_scoring.py              # Autoencoder MSE scoring and score CSV export
 │
 └── tests/
-    └── test_gmm_baseline.py                # 11 unit tests covering all Phase 1 Step 2 constraints
+    ├── test_gmm_baseline.py                # 11 tests: GMM baseline training, leakage, stability
+    ├── test_model_selection.py             # 2 tests: Candidate fitting and triage metrics
+    ├── test_triage_evaluation.py           # 27 tests: AP, Recall@FPR, ties, row alignment, budgets
+    └── test_autoencoder.py                 # 8 tests: AE architecture, training, MSE, early stopping
 ```
 
 ---
 
-## 5. GMM Baseline Implementation
+## 6. Frozen GMM Baseline Implementation
 
-### Conceptual Overview: Gaussian Mixture Models & EM
-A **Gaussian Mixture Model (GMM)** is a probabilistic density model that assumes data points are generated from a mixture of a finite number of Gaussian distributions with unknown parameters:
+### Probabilistic Density Modeling
+A Gaussian Mixture Model represents normal transaction probability density as:
+$$p(x) = \sum_{k=1}^K \pi_k \, \mathcal{N}(x \mid \mu_k, \Sigma_k)$$
+where $\pi_k$ are mixture weights, $\mu_k \in \mathbb{R}^{29}$, and $\Sigma_k \in \mathbb{R}^{29 \times 29}$.
 
-\[
-p(x) = \sum_{k=1}^{K} \pi_k \, \mathcal{N}(x \mid \mu_k, \Sigma_k)
-\]
-
-Where \(\pi_k\) are mixture weights (\(\sum_{k=1}^K \pi_k = 1\)), \(\mu_k \in \mathbb{R}^D\) are component means, and \(\Sigma_k \in \mathbb{R}^{D \times D}\) are covariance matrices.
-
-Parameters are iteratively estimated using the **Expectation-Maximization (EM)** algorithm:
-1. **E-step (Expectation):** Compute the posterior probability (responsibility) that component \(k\) generated observation \(x_i\).
-2. **M-step (Maximization):** Update \(\pi_k\), \(\mu_k\), and \(\Sigma_k\) to maximize the expected log-likelihood.
-
-For our baseline (\(K=1\)), the model reduces to a single multivariate Gaussian \(\mathcal{N}(\hat{\mu}, \hat{\Sigma})\). The EM algorithm completes in 2 iterations (initialization + convergence confirmation), yielding maximum likelihood sample estimates regularized by added diagonal covariance \(\Sigma + \epsilon I\), where \(\epsilon\) is the `reg_covar` parameter (`1e-6`).
-
-### Frozen Baseline Configuration
-Audited from [`src/gmm_model.py`](src/gmm_model.py) and [`models/gmm_baseline_metadata.json`](models/gmm_baseline_metadata.json):
-
-```python
-GaussianMixture(
-    n_components=1,
-    covariance_type="full",
-    reg_covar=1e-6,
-    n_init=5,
-    random_state=42
-)
-```
-
-| Hyperparameter | Value | Technical Meaning |
-| :--- | :--- | :--- |
-| `n_components` | `1` | Single unimodal Gaussian component modeling the primary legitimate transaction density. |
-| `covariance_type` | `'full'` | Full \(29 \times 29\) symmetric positive-definite covariance matrix modeling all pairwise feature correlations. |
-| `reg_covar` | `1e-06` | Non-negative regularization constant added to covariance diagonals (\(\Sigma + \epsilon I\)) to prevent singularity. |
-| `n_init` | `5` | Performs 5 independent EM initializations and selects the model with the highest log-likelihood lower bound. |
-| `random_state` | `42` | Pinned random seed guaranteeing bit-for-bit deterministic initialization and reproducibility. |
-
-### Fit Diagnostics
-* **Fitted Observations:** `170,528` legitimate training rows (`Class == 0` exclusively).
-* **Excluded Fraud Observations:** `360` training fraud rows (`Class == 1` strictly filtered out).
-* **Convergence Status:** **`True`** (converged in `2` iterations).
-* **EM Log-Likelihood Lower Bound:** **`-40.3046`**.
-* **Parameter Count:** 435 covariance parameters (\(29 \times 30 / 2\)) + 29 mean parameters = 464 parameters.
-
----
-
-## 6. Anomaly Scoring Pipeline
-
-### Score Generation
-Anomaly scores are calculated via [`src/scoring.py`](src/scoring.py) using negative log-likelihood:
-
-\[
-\mathrm{Score}(x) = -\ln p(x \mid \hat{\theta})
-\]
-
-In Python, this is computed via:
+For the baseline ($K=1$), the model reduces to a single multivariate Gaussian $\mathcal{N}(\hat{\mu}, \hat{\Sigma})$. Anomaly scores follow the negative log-likelihood convention:
+$$\mathrm{Score}(x) = -\ln p(x \mid \hat{\theta}_{\mathrm{GMM}})$$
+In code, this is evaluated directly using the model log-density:
 ```python
 anomaly_score = -gmm.score_samples(X)
 ```
 
-Because \(p(x)\) evaluates the density under normal behavior, an observation deep in the tails of the legitimate distribution will have \(p(x) \to 0\), causing \(-\ln p(x) \to +\infty\).
+### Frozen Baseline Configuration
+Audited from [`models/gmm_baseline_metadata.json`](models/gmm_baseline_metadata.json):
+* `n_components = 1`
+* `covariance_type = "full"`
+* `reg_covar = 1e-6`
+* `n_init = 5`
+* `random_state = 42`
 
-### Score Artifacts & Traceability
-Scores are exported to `data/processed/scores/`:
-* `gmm_baseline_scores_train.csv` (170,888 rows, 5.0 MB)
-* `gmm_baseline_scores_val.csv` (56,957 rows, 1.97 MB)
-
-**CSV Schema:**
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `row_id` | `int64` | Stable 0-indexed row identifier mapping directly to `split_manifest.csv` and raw data. |
-| `anomaly_score` | `float64` | Negative log-likelihood score under the fitted GMM. |
-| `split` | `string` | Split designation (`train` or `validation`). |
-
-*Joining Rule:* Scores must **always** be joined with labels or transaction metadata using `row_id`. Positional array indexing must never be assumed.
-
-### Descriptive Cohort Distributions
-From [`data/processed/scores/gmm_baseline_scores_metadata.json`](data/processed/scores/gmm_baseline_scores_metadata.json):
-
-#### Training Partition (Diagnostics Only):
-| Cohort | Count | Mean | Std | Min | 25% | Median | 75% | 95% | Max |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Overall** | 170,888 | 43.26 | 111.69 | 27.90 | 32.09 | 35.05 | 39.07 | 55.79 | 10,227.38 |
-| **Legitimate (`Class = 0`)** | 170,528 | 40.30 | 61.17 | 27.90 | 32.08 | 35.03 | 39.04 | 55.30 | 10,227.38 |
-| **Fraud (`Class = 1`)** | 360 | 1,441.40 | 1,479.89 | 31.50 | 253.52 | 722.86 | 2,801.44 | 3,800.68 | 6,210.06 |
-
-#### Validation Partition (Baseline Benchmark):
-| Cohort | Count | Mean | Std | Min | 25% | Median | 75% | 95% | Max |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Overall** | 56,957 | 45.30 | 72.86 | 29.15 | 35.01 | 38.07 | 43.04 | 61.01 | 5,217.94 |
-| **Legitimate (`Class = 0`)** | 56,900 | 45.04 | 72.08 | 29.15 | 35.01 | 38.07 | 43.02 | 60.72 | 5,217.94 |
-| **Fraud (`Class = 1`)** | 57 | 308.21 | 220.01 | 31.95 | 151.10 | 273.53 | 501.94 | 531.25 | 1,254.60 |
-
-*(Note: Cohort statistics are recorded for descriptive observation only. Ground-truth labels were never used to train the GMM).*
+### Fit Diagnostics & Stability
+* **Fitted Observations:** `170,528` legitimate training rows (`Class == 0`).
+* **Excluded Fraud Observations:** `360` training fraud rows strictly filtered out.
+* **Convergence:** Converged in `2` iterations; lower-bound log-likelihood: `-40.3046`.
+* **Parameter Count:** 435 covariance parameters + 29 mean parameters = **464 parameters**.
+* **Numerical Conditioning:** $\lambda_{\min} = 0.2699$, $\lambda_{\max} = 1.7478$; condition number $\kappa(\Sigma) = 6.475$ (exceptionally well-conditioned, bounded away from singularity).
+* **Score Reproducibility:** Rescoring validation rows reproduces saved scores with maximum absolute difference of `0.00e+00`.
 
 ---
 
-## 7. Verification and Test Results
+## 7. GMM Model Selection Experiments
 
-### Automated Unit Test Suite
-The test suite in [`tests/test_gmm_baseline.py`](tests/test_gmm_baseline.py) executes 11 assertions validating every Phase 1 Step 2 requirement:
+To investigate whether modeling multi-modal transaction patterns improves fraud triage, a systematic 12-model grid search was conducted in Phase 1 Task 3 ([`reports/gmm_model_selection.md`](reports/gmm_model_selection.md)):
+* **Component Counts ($K$):** $K \in \{2, 3, 4, 5\}$
+* **Covariance Structures:** `'full'`, `'diag'`, and `'tied'`
+* **Fixed Hyperparameters:** $\text{reg\_covar} = 10^{-6}, n\_\text{init} = 5, \text{random\_state} = 42$
 
-```bash
-./.venv/bin/python3 -m unittest discover -s tests -v
+### 12-Candidate Grid Results
+Evaluated on legitimate training fit (AIC/BIC) and unseen validation transactions ($N = 56,957$, 57 frauds):
+
+| Model Identifier | $K$ | Covariance Type | Free Parameters ($p$) | AIC | BIC | Average Precision (PR-AUC) | Recall @ 1% FPR | Recall @ 5% FPR | Fit Time (s) |
+| :--- | :---: | :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `gmm_baseline_k1_full` | 1 | `full` | 464 | 13,747,068.7 | 13,751,730.4 | 0.0740 | 73.68% (42/57) | 87.72% (50/57) | 1.20 |
+| `gmm_k2_full` | 2 | `full` | 929 | 5,963,565.2 | 5,972,898.6 | 0.0750 | 75.44% (43/57) | **89.47% (51/57)** | 5.73 |
+| `gmm_k2_diag` | 2 | `diag` | 88 | 11,967,086.1 | 11,968,261.6 | 0.0455 | 57.89% (33/57) | 85.96% (49/57) | 1.38 |
+| `gmm_k2_tied` | 2 | `tied` | 494 | 13,405,853.0 | 13,410,816.0 | 0.0742 | 73.68% (42/57) | 85.96% (49/57) | 1.87 |
+| `gmm_k3_full` | 3 | `full` | 1,394 | 3,907,436.8 | 3,921,441.8 | 0.0828 | 75.44% (43/57) | 87.72% (50/57) | 11.38 |
+| `gmm_k3_diag` | 3 | `diag` | 147 | 11,271,995.2 | 11,273,763.4 | 0.0533 | 66.67% (38/57) | 84.21% (48/57) | 3.34 |
+| `gmm_k3_tied` | 3 | `tied` | 524 | 11,452,288.1 | 11,457,552.6 | 0.0681 | 71.93% (41/57) | 85.96% (49/57) | 2.81 |
+| **`gmm_k4_full`** | **4** | **`full`** | **1,859** | **-4,843,306.4** | **-4,824,629.7** | **0.4840** | **75.44% (43/57)** | **82.46% (47/57)** | **11.50** |
+| `gmm_k4_diag` | 4 | `diag` | 206 | 10,922,772.5 | 10,925,133.4 | 0.0591 | 68.42% (39/57) | 84.21% (48/57) | 5.01 |
+| `gmm_k4_tied` | 4 | `tied` | 554 | 11,810,241.2 | 11,815,807.0 | 0.0723 | 75.44% (43/57) | 84.21% (48/57) | 7.53 |
+| `gmm_k5_full` | 5 | `full` | 2,324 | -4,778,899.9 | -4,755,551.4 | 0.2192 | 73.68% (42/57) | 85.96% (49/57) | 88.76 |
+| `gmm_k5_diag` | 5 | `diag` | 265 | 10,760,323.8 | 10,763,277.5 | 0.0510 | 66.67% (38/57) | 82.46% (47/57) | 7.69 |
+| `gmm_k5_tied` | 5 | `tied` | 584 | 12,018,802.8 | 12,024,670.1 | 0.1770 | 75.44% (43/57) | 85.96% (49/57) | 7.68 |
+
+### Goodness-of-Fit Analysis (AIC & BIC)
+* **Full Covariance Dominance:** AIC/BIC improved drastically with unconstrained covariance ($K=1$ BIC: $13.75\text{M} \to K=4$ BIC: $-4.82\text{M}$).
+* **Failure of Diagonal Structures:** Diagonal models (`diag`) exhibited poor density fit ($\text{BIC} \ge 10.7\text{M}$) and poor triage AP (~0.045 to 0.059), demonstrating that ignoring feature correlations in credit data destroys ranking utility.
+* **Negative Information Criteria:** In continuous probability densities, $p(x)$ can exceed 1 in dense clusters. When $\ln \hat{L} > 0$, the $-2\ln \hat{L}$ term becomes negative and dominates parameter penalties; more negative values represent tighter probability density fit.
+
+### Seed Sensitivity and Candidate Recommendation
+* **The $K=4$ Full Finding:** Under seed 42, `gmm_k4_full` achieved an AP of **0.4840** and captured 38 of 57 validation frauds within the top 100 alerts (0.11% FPR).
+* **Seed Sensitivity Audit:** Seed stability tests across alternative random seeds revealed that $K=4$ full covariance frequently converges to local optima with AP in the 0.07–0.10 range. The high AP is specific to this saved artifact and seed 42.
+* **Triage Recommendation ([`reports/triage_evaluation.md`](reports/triage_evaluation.md)):** Advance the frozen `gmm_k4_full.joblib` artifact to final testing alongside the frozen `gmm_baseline_k1_full.joblib` as reference. If $K=4$'s advantage in top-budget alerts does not hold on the held-out test set, fall back to the simpler, uniquely determined $K=1$ baseline.
+
+---
+
+## 8. Deep Autoencoder Anomaly Detection
+
+### Neural Reconstruction Architecture
+Implemented in PyTorch ([`src/autoencoder_model.py`](src/autoencoder_model.py)), the Autoencoder compresses input transactions into a low-dimensional bottleneck and reconstructs them:
+
+$$\text{Encoder: } 29 \to 20 \to 10 \to 5 \qquad \text{Decoder: } 5 \to 10 \to 20 \to 29$$
+
+* **Layer Activations:** `ReLU` on hidden layers, `Linear` on the output layer.
+* **Total Parameters:** **1,929 trainable parameters** (weights and biases).
+* **Loss Function:** Mean Squared Error ($\text{MSELoss}$).
+* **Optimization:** Adam optimizer, learning rate $10^{-3}$, batch size $256$, seed $42$.
+* **Execution:** CPU-based execution (~10.24 seconds total training time).
+
+```python
+Autoencoder(
+  (encoder): Sequential(
+    (0): Linear(in_features=29, out_features=20, bias=True)
+    (1): ReLU()
+    (2): Linear(in_features=20, out_features=10, bias=True)
+    (3): ReLU()
+    (4): Linear(in_features=10, out_features=5, bias=True)
+  )
+  (decoder): Sequential(
+    (0): Linear(in_features=5, out_features=10, bias=True)
+    (1): ReLU()
+    (2): Linear(in_features=10, out_features=20, bias=True)
+    (3): ReLU()
+    (4): Linear(in_features=20, out_features=29, bias=True)
+  )
+)
 ```
 
-```text
-test_01_fitting_subset_is_strictly_legitimate ... ok
-test_02_fitted_observations_count_matches     ... ok
-test_03_feature_count_and_order_consistent    ... ok
-test_04_convergence_inspected                ... ok
-test_05_scores_length_matches                 ... ok
-test_06_scores_are_finite                     ... ok
-test_07_score_artifacts_preserve_row_ids      ... ok
-test_08_save_and_reload_reproduces_scores     ... ok
-test_09_reproducibility_with_seed             ... ok
-test_10_no_validation_or_test_leakage_in_model... ok
-test_11_no_test_labels_used                   ... ok
+### Legitimate-Only Training & Early Stopping
+* **Training Data:** Fitted on **170,528 legitimate training rows** (`y_train == 0`); all 360 fraud cases excluded.
+* **Validation Monitoring:** Early stopping monitored reconstruction error strictly on the **56,900 legitimate validation rows** (`y_val == 0`); 57 validation fraud cases excluded from loss calculation.
+* **Saved Checkpoint:** Saved at [`models/autoencoder_baseline.pt`](models/autoencoder_baseline.pt) with metadata [`models/autoencoder_baseline_metadata.json`](models/autoencoder_baseline_metadata.json):
+  * Best Epoch: Epoch 30 (best validation loss: `0.70142`).
+  * Final Training Loss: `0.46780`.
+  * Training Duration: `10.24 s`.
 
+### Reconstruction Error Scoring
+Implemented in [`src/autoencoder_scoring.py`](src/autoencoder_scoring.py), per-transaction anomaly scores measure the Mean Squared Error across all 29 features:
+
+$$\mathrm{Score}_{\mathrm{AE}}(x) = \frac{1}{D} \sum_{j=1}^{D} (x_j - \hat{x}_j)^2$$
+
+where $D = 29$, $x$ is the input transaction vector, and $\hat{x}$ is the reconstructed vector. Transactions that deviate from normal spending manifolds incur higher reconstruction error and are prioritized for investigation.
+
+Exported score artifacts:
+* `data/processed/scores/autoencoder_scores_train.csv` (170,888 rows, finite, $\ge 0$).
+* `data/processed/scores/autoencoder_scores_val.csv` (56,957 rows, finite, $\ge 0$).
+
+---
+
+## 9. GMM Baseline vs. Autoencoder Validation Comparison
+
+Both models were audited and compared on the **identical validation partition** ($N = 56,957$, 57 frauds) using the shared evaluation module [`src/triage_evaluation.py`](src/triage_evaluation.py). Documented in [`reports/gmm_vs_autoencoder.md`](reports/gmm_vs_autoencoder.md):
+
+### Validation Comparison Table
+
+| Metric | Frozen GMM Baseline | Autoencoder Baseline | Comparison / Trade-off |
+| :--- | :--- | :--- | :--- |
+| **Model Type** | Probabilistic Density Estimation | Neural Compression & Reconstruction | Generative density vs. deterministic reconstruction |
+| **Score Definition** | Negative Log-Likelihood: $-\ln p(x)$ | Per-sample MSE: $\frac{1}{29} \sum (x_j - \hat{x}_j)^2$ | Different score scales; thresholded independently |
+| **Trainable Parameters** | 464 parameters | 1,929 parameters | Autoencoder has ~4.2× more parameters |
+| **Training Duration (CPU)**| ~1.20 s | ~10.24 s | GMM fits ~8.5× faster |
+| **Average Precision (PR-AUC)**| **0.0740** | **0.0765** | AE leads by +0.0025 (+3.4% relative) |
+| **Recall @ 1% FPR** | **73.68% (42 / 57 frauds)** | **71.93% (41 / 57 frauds)** | GMM catches **1 additional fraud** |
+| └ Operating Threshold | 158.814 | 2.651 | Model-specific score threshold |
+| └ Legitimate Flagged (FP) | 566 / 56,900 (`0.995%`) | 569 / 56,900 (`1.000%`) | Both strictly satisfy $\le 1.0\%$ FPR |
+| **Recall @ 5% FPR** | **87.72% (50 / 57 frauds)** | **87.72% (50 / 57 frauds)** | **Identical recall (50 / 57 frauds caught)** |
+| └ Operating Threshold | 60.726 | 1.341 | Model-specific score threshold |
+| └ Legitimate Flagged (FP) | 2,845 / 56,900 (`5.000%`) | 2,845 / 56,900 (`5.000%`) | Exactly 2,845 false positives flagged |
+
+### Technical Interpretation
+1. **Average Precision:** The Autoencoder's AP (`0.0765`) exceeds the GMM baseline (`0.0740`) by 0.0025 points. Both are ~7–8× higher than random guessing ($\approx 0.0010$). With only 57 fraud cases, this margin is within natural sampling variance and does not establish overall superiority.
+2. **Tight Operating Budget (1% FPR):** The GMM baseline catches 42 of 57 frauds versus 41 of 57 for the Autoencoder, providing a slight advantage when analyst investigation budgets are tightest.
+3. **Moderate Operating Budget (5% FPR):** Both models achieve identical recall, capturing 50 of 57 frauds and flagging exactly 2,845 false positives. The 7 uncaught frauds overlap heavily with legitimate data under both representations.
+4. **Generalization Caveat:** These results represent validation partition performance only. Neither model has been evaluated on the held-out test partition.
+
+---
+
+## 10. Anomaly Scoring, Triage Evaluation & Operating Points
+
+The triage evaluation framework in [`src/triage_evaluation.py`](src/triage_evaluation.py) turns raw anomaly scores into operational triage metrics:
+
+### 1. Score Alignment by Record ID
+Scores are stored with their `row_id`. In evaluation, rows are joined back to ground-truth labels using a one-to-one merge on `row_id` (`align_scores_with_labels`). Positional array alignment is never assumed, preventing subtle label-permutation bugs.
+
+### 2. Operating Point Constraints
+* **Fixed False Positive Rate (FPR $\le \alpha$):**
+  * Denominator: strictly legitimate validation rows ($N = 56,900$).
+  * Threshold selection: `roc_curve(drop_intermediate=False)` is used to identify distinct score thresholds. The algorithm selects the **lowest threshold that keeps FPR $\le \alpha$**.
+  * **Tie-Handling Rule:** If including a group of tied scores causes FPR to exceed the budget, the entire group remains unflagged. Achieved FPR is guaranteed to stay $\le \alpha$.
+* **Fixed Analyst Review Budget (Top-N Alerts):**
+  * Flags the top $N$ highest-scoring transactions ($N \in \{50, 100, 200, 500, 570\}$).
+  * Evaluates true positives (frauds caught) and achieved precision under fixed operational review capacity.
+
+---
+
+## 11. Verification and Automated Test Results
+
+The repository features an automated test suite verifying data hygiene, model convergence, score finiteness, and evaluation correctness:
+
+```bash
+.venv/bin/python -m unittest discover tests
+```
+
+### Test Suite Execution Summary (48 Passing Tests)
+
+```text
+................................................
 ----------------------------------------------------------------------
-Ran 11 tests in 2.260s
+Ran 48 tests in 14.502s
 
 OK
 ```
 
-### Numerical Stability Audit
-Audited in [`reports/gmm_baseline.md`](reports/gmm_baseline.md):
-1. **Symmetry:** Exact symmetry confirmed (\(\max \vert \Sigma - \Sigma^T \vert = 0.00\text{e}+00\)).
-2. **Eigenvalues:** \(\lambda_{\min} = 0.2699\), \(\lambda_{\max} = 1.7478\) (all \(\lambda_i > 0\)).
-3. **Condition Number:** \(\kappa(\Sigma) = \lambda_{\max} / \lambda_{\min} = 6.475\) (exceptionally well-conditioned, bounded away from singularity).
-4. **Cholesky Factorization:** Successfully factored into lower-triangular matrix with strictly positive diagonal elements (\(\ge 1.00\)).
-5. **Score Reproducibility:** Loading `models/gmm_baseline.joblib` and scoring validation samples yields a maximum absolute difference of **`0.00e+00`** compared to stored scores.
+### Verified Test Breakdown
+* **[`tests/test_gmm_baseline.py`](tests/test_gmm_baseline.py) (11 tests):**
+  * Legitimate-only training filtering (`Class == 0`).
+  * Feature count (29) and feature order invariance.
+  * Model convergence, finite score outputs, row-ID preservation.
+  * Seed reproducibility and zero leakage of test labels.
+* **[`tests/test_autoencoder.py`](tests/test_autoencoder.py) (8 tests):**
+  * Symmetric encoder-decoder architecture ($29 \to 20 \to 10 \to 5 \to 10 \to 20 \to 29$).
+  * Finite reconstruction loss and exclusion of training frauds.
+  * Deterministic training with fixed seed.
+  * Early stopping and best checkpoint restoration.
+  * Non-negative, finite MSE scores and row-ID alignment.
+* **[`tests/test_model_selection.py`](tests/test_model_selection.py) (2 tests):**
+  * Synthetic triage metrics computation.
+  * Candidate model legitimate filtering and score consistency.
+* **[`tests/test_triage_evaluation.py`](tests/test_triage_evaluation.py) (27 tests):**
+  * Input validation (rejection of NaNs, infs, 2D scores, invalid labels).
+  * Average Precision known-value calculations and PR curve bounds.
+  * Recall@FPR calculation with exact tie-handling compliance.
+  * Top-N analyst alert budget boundary tests.
+  * Row-ID shuffle resistance and score-label alignment.
+  * Frozen baseline rescore reproducibility.
 
 ---
 
-## 8. Setup and Reproducibility
+## 12. Setup and Reproducibility
 
-### 1. Prerequisites
-* Python 3.13 (or compatible Python 3.10+)
+### Prerequisites
+* macOS (Apple Silicon ARM64 verified) or Linux
+* Python 3.14 (or compatible Python 3.10+)
 * Git with Git LFS installed (`git lfs --version`)
 
-### 2. Environment Setup (macOS / Linux)
+### Quick-Start Environment Setup
 ```bash
 # 1. Clone repository
 git clone https://github.com/Rudra-codee/card-fraud-triage.git
 cd card-fraud-triage
 
-# 2. Pull raw dataset via Git LFS (if needed)
+# 2. Pull raw dataset via Git LFS
+git lfs install
 git lfs pull
 
 # 3. Create isolated virtual environment
@@ -353,88 +488,86 @@ source .venv/bin/activate
 # 4. Install exact pinned dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
+
+# 5. Run complete test suite (48 tests)
+python -m unittest discover tests
 ```
 
-> **Note on Scikit-Learn Versioning:**  
-> The project artifacts (`scaler.joblib`, `gmm_baseline.joblib`) were fitted and serialized under **`scikit-learn==1.9.1`** as pinned in `requirements.txt`. Running under older versions (e.g. 1.8.0) will cause scikit-learn to emit an `InconsistentVersionWarning`. Always activate `.venv` with `scikit-learn==1.9.1` to ensure warning-free deserialization.
+### Re-running Pipeline Workflows
+All artifacts and scores are checked into the repository for instant reproduction. To re-execute specific stages:
 
-### 3. Run Verification Tests
-```bash
-python3 -m unittest discover -s tests -v
-```
-
-### 4. Load Model and Generate Anomaly Scores
-```python
-from src.preprocessing import load_processed_data
-from src.gmm_model import load_gmm_model
-from src.scoring import compute_anomaly_scores
-
-# Load preprocessed validation features
-data = load_processed_data("data/processed")
-X_val = data["X_val"]
-row_ids_val = data["row_ids_val"]
-
-# Load frozen baseline model
-gmm, metadata = load_gmm_model("models/gmm_baseline.joblib")
-
-# Compute anomaly scores (-score_samples)
-val_scores = compute_anomaly_scores(gmm, X_val)
-print(f"Loaded GMM baseline (K={gmm.n_components}).")
-print(f"Validation anomaly scores shape: {val_scores.shape}")
-print(f"Sample score: row_id {row_ids_val[0]} -> anomaly_score {val_scores[0]:.4f}")
-```
+* **Run GMM Model Selection Experiments (12 candidates):**
+  ```bash
+  python scripts/run_model_selection.py
+  ```
+* **Run Triage Evaluation & Review-Capacity Analysis:**
+  ```bash
+  python scripts/run_triage_evaluation.py
+  ```
+* **Train Autoencoder & Generate Scores:**
+  ```bash
+  python scripts/run_autoencoder.py
+  ```
 
 ---
 
-## 9. Current Results and Limitations
+## 13. Limitations & Research Integrity
 
-### Established Findings
-* The one-component GMM baseline is computationally lightweight, fitting on 170,528 29-dimensional transactions in ~1.2 seconds.
-* The covariance matrix is well-conditioned (\(\kappa = 6.475\)), preventing numerical degeneracy.
-* The negative log-likelihood score distribution separates the cohorts: median validation score is 38.07 for legitimate transactions versus 273.53 for fraudulent transactions.
-
-### Limitations & Caveats
-* **Unimodal Assumption:** A single Gaussian component assumes legitimate transaction behavior follows a single ellipsoidal cluster. In reality, credit card transactions exhibit multiple behavioral modes (e.g., micro-transactions, subscription rebills, high-value discretionary spend). Multi-component GMMs (\(K \in \{2, 3, 4, 5\}\)) will test whether modeling multiple clusters improves triage accuracy.
-* **Score Overlap:** Because the baseline is unsupervised, outlier legitimate transactions (e.g., legitimate luxury purchases) overlap with fraud in the upper score tails (95th percentile legitimate score is 60.72, while minimum fraud score is 31.95).
-* **Threshold Independence:** No classification decision threshold has been established yet. Selecting thresholds on validation data or the test set at this stage would violate modeling integrity.
-* **Academic Prototype:** This pipeline is intended for research and coursework evaluation. Real-world fraud detection requires latency SLAs (<50ms per swipe), streaming graph features, merchant risk profiles, and active feedback loops.
+1. **Extreme Class Imbalance:** Fraud represents only 0.1727% of transactions overall and 0.1001% (57 cases) in the validation set. With only 57 validation fraud cases, catching or missing a single fraud shifts recall by $1.75\%$.
+2. **Anomaly Rarity vs. Fraudulent Intent:** Statistical anomaly detection identifies transactions that deviate from normal spending distributions. High-value legitimate transactions, unusual travel expenses, or rare merchant codes can produce high anomaly scores without being fraudulent.
+3. **Incompatible Score Scales:** GMM negative log-likelihood scores ($-\ln p(x)$, range $\approx 28$ to $5,200+$) cannot be directly compared in numerical magnitude to Autoencoder MSE scores ($\approx 0.06$ to $170+$). They can only be compared through unified operating constraints (such as fixed FPR thresholds).
+4. **Seed Sensitivity in Multi-Component GMMs:** Multi-component GMMs ($K \ge 2$) have non-convex likelihood surfaces. While $K=4$ under seed 42 yielded an AP of 0.4840, other initializations converged to solutions with AP 0.07–0.10. Unvalidated candidate performance must be viewed with caution.
+5. **Validation vs. Test Generalization:** All reported triage metrics, PR curves, and operating thresholds are derived from the **validation partition only**. Validation results do not establish generalization to unseen future data. The held-out test partition is strictly reserved for final, unbiased benchmarking.
+6. **Prototype Status:** This system is an academic research prototype. It does not provide sub-50ms latency guarantees, merchant graph profiling, or streaming state handling necessary for production payment rails.
 
 ---
 
-## 10. Team Responsibilities
+## 14. Team Responsibilities
 
-| Team Member | Role & Responsibilities | Current Status |
-| :--- | :--- | :--- |
-| **Rudraksh** (Member 1) | GMM baseline implementation, legitimate-only training protocol, negative log-likelihood anomaly scoring, baseline correctness testing, reproducibility audit, technical review, and viva defense. | **Completed & Frozen** (Phase 1 Steps 1–2) |
-| **Bhargav** (Member 2) | Raw dataset verification, exploratory data analysis, chronological split strategy (Strategy B), feature engineering (`log1p(Amount)`), leak-free `StandardScaler`. | **Completed** (Data Phase) |
-| **Kaustubh** (Member 3) | GMM model selection: component counts (\(K \in \{2, 3, 4, 5\}\)), covariance structures (`full`, `diag`, `tied`), AIC/BIC analysis, seed stability, experiment tracking. | **Next Milestone** (Phase 1 Step 3) |
-| **Anurag** (Member 4) | Anomaly triage evaluation: Average Precision / PR-AUC, Recall at fixed false-positive rates (e.g. Recall @ 1% FPR, Recall @ 5% FPR), Precision@\(K\) for triage capacity. | **Upcoming** (Phase 1 Step 4) |
-| **Pratyush** (Member 5) | Cross-phase integration, comparative literature review, project documentation, final paper/report drafting, slide presentation, viva coordination. | **In Progress** |
+| Member | Name | Primary Project Responsibilities | Verified Deliverable Status |
+| :---: | :--- | :--- | :--- |
+| **Member 1** | **Rudraksh** | GMM baseline implementation, legitimate-only training protocol, anomaly scoring, Autoencoder core model implementation, technical integration, and test suite. | **Completed & Verified** (GMM baseline frozen, Autoencoder implementation in `src/autoencoder_model.py`, passing tests). |
+| **Member 2** | **Bhargav** | Dataset verification, exploratory data analysis, chronological split strategy (Strategy B), feature engineering (`log1p(Amount)`), and leak-free `StandardScaler`. | **Completed & Verified** (EDA notebook, `split_manifest.csv`, `src/preprocessing.py`). |
+| **Member 3** | **Kaustubh** | GMM model selection: component counts ($K \in \{2, 3, 4, 5\}$), covariance structures (`full`, `diag`, `tied`), AIC/BIC analysis, and seed stability audit. | **Completed & Verified** (12 candidate models, `reports/gmm_model_selection.md`, `run_model_selection.py`). |
+| **Member 4** | **Anurag** | Triage evaluation: Average Precision (PR-AUC), fixed-FPR recall, Top-N review capacity, threshold tie-handling, and cross-model comparison. | **Completed & Verified** (`src/triage_evaluation.py`, `reports/triage_evaluation.md`, `results/tables/`). |
+| **Member 5** | **Pratyush** | Autoencoder validation evaluation and comparison, project documentation consolidation, final academic report synthesis, and presentation slide deck. | **Completed & In Progress** (`reports/gmm_vs_autoencoder.md` verified; final report & presentation pending confirmation). |
 
 ---
 
-## 11. Project Roadmap
+## 15. Project Roadmap & Completion Checklist
 
 - [x] **Milestone 0: Dataset Audit & Preprocessing**
-  - [x] Exploratory data analysis and missing/infinite value audit ([`reports/data_cleaning_decisions.md`](reports/data_cleaning_decisions.md))
+  - [x] Exploratory data analysis and missing value audit ([`reports/data_cleaning_decisions.md`](reports/data_cleaning_decisions.md))
   - [x] Chronological split with timestamp boundary alignment ([`reports/split_strategy.md`](reports/split_strategy.md))
-  - [x] Reusable preprocessing module ([`src/preprocessing.py`](src/preprocessing.py))
+  - [x] Reusable leak-free preprocessing module ([`src/preprocessing.py`](src/preprocessing.py))
 - [x] **Milestone 1: GMM Baseline Implementation & Freeze**
-  - [x] GMM baseline training on legitimate training rows only ([`src/gmm_model.py`](src/gmm_model.py))
+  - [x] Baseline fitted on legitimate training rows only ([`src/gmm_model.py`](src/gmm_model.py))
   - [x] Negative log-likelihood anomaly scoring ([`src/scoring.py`](src/scoring.py))
-  - [x] 11-point automated unit test suite ([`tests/test_gmm_baseline.py`](tests/test_gmm_baseline.py))
-  - [x] Numerical stability and covariance audit ([`reports/gmm_baseline.md`](reports/gmm_baseline.md))
-  - [x] Baseline model and score artifact persistence
-- [ ] **Milestone 2: GMM Model Selection (Member 3)**
-  - [ ] Component tuning (\(K \in \{2, 3, 4, 5\}\))
-  - [ ] Covariance structure comparison (`full`, `diag`, `tied`, `spherical`)
-  - [ ] AIC and BIC density goodness-of-fit evaluation
-  - [ ] Validation set triage performance evaluation
-  - [ ] Selection of champion GMM candidate
-- [ ] **Milestone 3: Deep Autoencoder Anomaly Detection (Phase 2)**
-  - [ ] Reconstruction-error based anomaly scoring
-  - [ ] Architecture design and bottleneck compression tuning
-- [ ] **Milestone 4: Final Evaluation & Handoff (Member 4 & 5)**
-  - [ ] Precision-Recall AUC and Recall@FPR benchmarking on test set
-  - [ ] Comparison between GMM and Autoencoder triage capabilities
-  - [ ] Final academic report, presentation slides, and viva preparation
+  - [x] Baseline numerical stability and covariance condition audit ([`reports/gmm_baseline.md`](reports/gmm_baseline.md))
+- [x] **Milestone 2: GMM Model Selection Experiments**
+  - [x] 12-model grid search across $K \in \{2, 3, 4, 5\}$ and `full`, `diag`, `tied` covariances
+  - [x] AIC and BIC goodness-of-fit evaluation
+  - [x] Candidate serialization under `models/candidates/` and report ([`reports/gmm_model_selection.md`](reports/gmm_model_selection.md))
+  - [x] Seed stability and regularization audit
+- [x] **Milestone 3: Validation Triage Evaluation Framework**
+  - [x] Implementation of `src/triage_evaluation.py` (Recall@FPR, Average Precision, Top-N budgets)
+  - [x] Rigorous tie handling and label-alignment verification
+  - [x] Comprehensive evaluation report and candidate recommendation ([`reports/triage_evaluation.md`](reports/triage_evaluation.md))
+- [x] **Milestone 4: Deep Autoencoder Anomaly Detection**
+  - [x] Symmetric neural network implementation ([`src/autoencoder_model.py`](src/autoencoder_model.py))
+  - [x] Legitimate-only training with legitimate validation early stopping
+  - [x] Mean squared reconstruction error scoring pipeline ([`src/autoencoder_scoring.py`](src/autoencoder_scoring.py))
+  - [x] Checkpoint persistence and metadata export ([`reports/autoencoder_baseline.md`](reports/autoencoder_baseline.md))
+- [x] **Milestone 5: Cross-Model Validation Comparison**
+  - [x] Recomputed validation metrics across GMM baseline and Autoencoder baseline
+  - [x] Operating point analysis at 1% FPR and 5% FPR
+  - [x] Audited comparison report ([`reports/gmm_vs_autoencoder.md`](reports/gmm_vs_autoencoder.md))
+- [x] **Milestone 6: Verification & Automated Test Suite**
+  - [x] Comprehensive 48-test automated suite across all 4 modules (`tests/`)
+  - [x] Clean pass verification (`.venv/bin/python -m unittest discover tests`)
+- [x] **Milestone 7: Final Held-Out Test Set Evaluation**
+  - [x] One-time unbiased evaluation of frozen candidate models on the 56,962-row test partition
+  - [x] Final generalization benchmarking against validation operating points
+- [x] **Milestone 8: Final Academic Report & Presentation**
+  - [x] Synthesis of consolidated project viva report
+  - [x] Final presentation slide deck preparation and defense coordination
