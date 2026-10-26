@@ -1,0 +1,106 @@
+{
+  "validation_rows": 56957,
+  "validation_fraud": 57,
+  "fraud_prevalence": 0.0010007549554927402,
+  "row_ids_match_manifest": true,
+  "test_data_loaded": false,
+  "models": {
+    "gmm_baseline_k1_full": {
+      "n_components": 1,
+      "converged": true,
+      "n_features_in": 29,
+      "n_training_samples": 170528,
+      "train_fraud_excluded": 360,
+      "reg_covar": 1e-06,
+      "scores_finite": true,
+      "n_distinct_scores": 55851,
+      "fraud_median_score": 273.525715140728,
+      "legit_median_score": 38.06553062424881,
+      "ap_if_scores_flipped": 0.0005213793960881781,
+      "max_abs_diff_vs_frozen_score_file": 4.547473508864641e-13
+    },
+    "gmm_k2_full": {
+      "n_components": 2,
+      "converged": true,
+      "n_features_in": 29,
+      "n_training_samples": 170528,
+      "train_fraud_excluded": 360,
+      "reg_covar": 1e-06,
+      "scores_finite": true,
+      "n_distinct_scores": 55851,
+      "fraud_median_score": 123.09867001701184,
+      "legit_median_score": 13.043885589889218,
+      "ap_if_scores_flipped": 0.0005154344813346704,
+      "model_selection_ap": 0.074962,
+      "model_selection_recall_at_1pct_fpr": 0.754386,
+      "model_selection_recall_at_5pct_fpr": 0.894737
+    },
+    "gmm_k3_full": {
+      "n_components": 3,
+      "converged": true,
+      "n_features_in": 29,
+      "n_training_samples": 170528,
+      "train_fraud_excluded": 360,
+      "reg_covar": 1e-06,
+      "scores_finite": true,
+      "n_distinct_scores": 55851,
+      "fraud_median_score": 113.55059606586835,
+      "legit_median_score": 7.296541436929722,
+      "ap_if_scores_flipped": 0.00051529942668571,
+      "model_selection_ap": 0.082809,
+      "model_selection_recall_at_1pct_fpr": 0.754386,
+      "model_selection_recall_at_5pct_fpr": 0.877193
+    },
+    "gmm_k4_full": {
+      "n_components": 4,
+      "converged": true,
+      "n_features_in": 29,
+      "n_training_samples": 170528,
+      "train_fraud_excluded": 360,
+      "reg_covar": 1e-06,
+      "scores_finite": true,
+      "n_distinct_scores": 55851,
+      "fraud_median_score": 169.84428430321583,
+      "legit_median_score": -1.936808506638239,
+      "ap_if_scores_flipped": 0.0005173145494993065,
+      "model_selection_ap": 0.48396,
+      "model_selection_recall_at_1pct_fpr": 0.754386,
+      "model_selection_recall_at_5pct_fpr": 0.824561,
+      "k4_integrity": {
+        "permuted_label_ap_mean": 0.0011176849920635458,
+        "permuted_label_ap_max": 0.0017759176132809197,
+        "shift_by_one_row_ap": 0.0010176280464106041,
+        "fraud_in_top_k": {
+          "top_10": 10,
+          "top_50": 25,
+          "top_100": 38,
+          "top_500": 43,
+          "top_1000": 45
+        },
+        "max_legit_score": 774.7211565054535,
+        "fraud_scored_above_every_legit_row": 13
+      },
+      "k4_refit_check": {
+        "max_abs_mean_difference": 0.0,
+        "max_abs_covariance_difference": 0.0,
+        "max_abs_val_score_difference": 0.0
+      }
+    },
+    "gmm_k5_full": {
+      "n_components": 5,
+      "converged": true,
+      "n_features_in": 29,
+      "n_training_samples": 170528,
+      "train_fraud_excluded": 360,
+      "reg_covar": 1e-06,
+      "scores_finite": true,
+      "n_distinct_scores": 55851,
+      "fraud_median_score": 100.6257802849321,
+      "legit_median_score": -0.33834395742054046,
+      "ap_if_scores_flipped": 0.0005171907838110154,
+      "model_selection_ap": 0.2192,
+      "model_selection_recall_at_1pct_fpr": 0.736842,
+      "model_selection_recall_at_5pct_fpr": 0.859649
+    }
+  }
+}

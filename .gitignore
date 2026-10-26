@@ -13,6 +13,12 @@ env/
 results/figures/*
 results/tables/*
 
+# Small, shareable triage evaluation outputs (Member 4, Task 1).
+# triage_pr_curve_data.csv (~18 MB) stays ignored; regenerate it with scripts/run_triage_evaluation.py
+!results/tables/triage_model_comparison.csv
+!results/tables/triage_validation_checks.json
+!results/figures/triage_precision_recall_curve.png
+
 # OS
 .DS_Store
 
