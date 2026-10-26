@@ -1,0 +1,60 @@
+{
+  "source_dataset_path": "data/raw/creditcard.csv",
+  "split_manifest_path": "data/splits/split_manifest.csv",
+  "feature_count": 29,
+  "feature_names": [
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6",
+    "V7",
+    "V8",
+    "V9",
+    "V10",
+    "V11",
+    "V12",
+    "V13",
+    "V14",
+    "V15",
+    "V16",
+    "V17",
+    "V18",
+    "V19",
+    "V20",
+    "V21",
+    "V22",
+    "V23",
+    "V24",
+    "V25",
+    "V26",
+    "V27",
+    "V28",
+    "Amount"
+  ],
+  "amount_transformation": "np.log1p(Amount)",
+  "scaler_type": "StandardScaler",
+  "scaler_fit_criteria": "Training partition rows where Class == 0 only (legitimate transactions)",
+  "scaler_n_samples_seen": 170528,
+  "partitions": {
+    "train": {
+      "total_rows": 170888,
+      "fraud_count": 360,
+      "legitimate_count": 170528,
+      "fraud_percentage": 0.2106642947427555
+    },
+    "validation": {
+      "total_rows": 56957,
+      "fraud_count": 57,
+      "legitimate_count": 56900,
+      "fraud_percentage": 0.10007549554927403
+    },
+    "test": {
+      "total_rows": 56962,
+      "fraud_count": 75,
+      "legitimate_count": 56887,
+      "fraud_percentage": 0.1316667251852112
+    }
+  }
+}
