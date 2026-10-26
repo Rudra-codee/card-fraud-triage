@@ -1,0 +1,7 @@
+model_name,label,operating_point,frozen_threshold,target_val_fpr,achieved_val_fpr,val_recall,actual_test_fpr,test_alerts,test_tp,test_fp,test_recall,test_precision
+gmm_baseline,GMM Baseline (K=1 full),1% validation FPR,158.81380296025483,0.01,0.009947,0.736842,0.00664475187652715,432,54,378,0.72,0.125
+gmm_baseline,GMM Baseline (K=1 full),5% validation FPR,60.72575217322757,0.05,0.05,0.877193,0.04013219188918382,2346,63,2283,0.84,0.026854219948849106
+gmm_k4_full,GMM K=4 Full Covariance,1% validation FPR,66.43595478102685,0.01,0.009965,0.754386,0.005888867403800517,392,57,335,0.76,0.14540816326530612
+gmm_k4_full,GMM K=4 Full Covariance,5% validation FPR,50.24139607102004,0.05,0.05,0.824561,0.036844973368256366,2156,60,2096,0.8,0.027829313543599257
+autoencoder_baseline,Autoencoder Baseline,1% validation FPR,2.651143789291382,0.01,0.01,0.719298,0.005590029356443475,373,55,318,0.7333333333333333,0.14745308310991956
+autoencoder_baseline,Autoencoder Baseline,5% validation FPR,1.341099739074707,0.05,0.05,0.877193,0.03601877406085749,2109,60,2049,0.8,0.02844950213371266

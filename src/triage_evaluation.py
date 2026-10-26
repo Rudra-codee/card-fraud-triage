@@ -357,3 +357,132 @@ def evaluate_scores(
         row.update(bootstrap_average_precision(labels, scores, n_resamples=n_bootstrap))
 
     return row
+
+
+def load_test_data(processed_dir: str = "data/processed") -> Dict[str, np.ndarray]:
+    """
+    Loads ONLY the test arrays (features, labels, row IDs).
+    Used exclusively for the final held-out test evaluation.
+    """
+    X_test = np.load(os.path.join(processed_dir, "X_test.npy"))
+    y_test = np.load(os.path.join(processed_dir, "y_test.npy"))
+    row_ids_test = np.load(os.path.join(processed_dir, "row_ids_test.npy"))
+
+    if not (len(X_test) == len(y_test) == len(row_ids_test)):
+        raise ValueError(
+            f"Test arrays have different lengths: X={len(X_test)}, y={len(y_test)}, ids={len(row_ids_test)}"
+        )
+
+    return {"X_test": X_test, "y_test": y_test, "row_ids_test": row_ids_test}
+
+
+def check_test_manifest_matches(row_ids_test: np.ndarray, manifest_path: str) -> int:
+    """
+    Confirms the test row IDs are exactly the rows marked 'test'
+    in the chronological split manifest. Returns the number of test rows.
+    """
+    manifest = pd.read_csv(manifest_path)
+    manifest_test_ids = manifest.loc[manifest["split"] == "test", "row_id"].to_numpy()
+
+    if len(np.unique(row_ids_test)) != len(row_ids_test):
+        raise ValueError("Test row IDs contain duplicates")
+
+    if set(manifest_test_ids) != set(row_ids_test):
+        raise ValueError("Test row IDs do not match the split manifest")
+
+    return int(len(manifest_test_ids))
+
+
+def evaluate_at_frozen_threshold(
+    labels: np.ndarray,
+    scores: np.ndarray,
+    threshold: float,
+) -> Dict[str, Any]:
+    """
+    Evaluates predictions at a pre-specified frozen threshold.
+    Flagging rule: score >= threshold.
+    FPR denominator is legitimate instances only (labels == 0).
+    Recall denominator is fraud instances only (labels == 1).
+    """
+    labels = np.asarray(labels)
+    scores = np.asarray(scores, dtype=float)
+    validate_labels(labels)
+    validate_scores(scores, len(labels))
+
+    flagged = scores >= threshold
+    is_fraud = labels == 1
+    is_legit = labels == 0
+
+    true_positives = int((flagged & is_fraud).sum())
+    false_positives = int((flagged & is_legit).sum())
+    total_fraud = int(is_fraud.sum())
+    total_legit = int(is_legit.sum())
+    alerts = int(flagged.sum())
+
+    recall = true_positives / total_fraud if total_fraud > 0 else 0.0
+    actual_fpr = false_positives / total_legit if total_legit > 0 else 0.0
+    precision = true_positives / alerts if alerts > 0 else 0.0
+
+    return {
+        "threshold": float(threshold),
+        "alerts": alerts,
+        "true_positives": true_positives,
+        "false_positives": false_positives,
+        "recall": float(recall),
+        "actual_fpr": float(actual_fpr),
+        "precision": float(precision),
+        "total_fraud": total_fraud,
+        "total_legit": total_legit,
+    }
+
+
+def evaluate_test_scores(
+    model_name: str,
+    labels: np.ndarray,
+    scores: np.ndarray,
+    threshold_1pct: float,
+    threshold_5pct: float,
+    n_bootstrap: int = 1000,
+) -> Dict[str, Any]:
+    """
+    Evaluates test scores against pre-specified frozen thresholds (1% and 5% validation FPR).
+    Does NOT refit or recompute thresholds from test labels.
+    """
+    labels = np.asarray(labels)
+    scores = np.asarray(scores, dtype=float)
+    validate_labels(labels)
+    validate_scores(scores, len(labels))
+
+    n_samples = int(len(labels))
+    fraud_count = int((labels == 1).sum())
+
+    at_1pct = evaluate_at_frozen_threshold(labels, scores, threshold_1pct)
+    at_5pct = evaluate_at_frozen_threshold(labels, scores, threshold_5pct)
+
+    row = {
+        "model_name": model_name,
+        "n_samples": n_samples,
+        "fraud_count": fraud_count,
+        "fraud_prevalence": fraud_count / n_samples,
+        "average_precision": float(average_precision_score(labels, scores)),
+        "roc_auc": float(roc_auc_score(labels, scores)),
+        "recall_at_1pct_fpr": at_1pct["recall"],
+        "threshold_1pct_fpr": at_1pct["threshold"],
+        "actual_fpr_1pct": at_1pct["actual_fpr"],
+        "tp_1pct_fpr": at_1pct["true_positives"],
+        "fp_1pct_fpr": at_1pct["false_positives"],
+        "alerts_1pct_fpr": at_1pct["alerts"],
+        "precision_1pct_fpr": at_1pct["precision"],
+        "recall_at_5pct_fpr": at_5pct["recall"],
+        "threshold_5pct_fpr": at_5pct["threshold"],
+        "actual_fpr_5pct": at_5pct["actual_fpr"],
+        "tp_5pct_fpr": at_5pct["true_positives"],
+        "fp_5pct_fpr": at_5pct["false_positives"],
+        "alerts_5pct_fpr": at_5pct["alerts"],
+        "precision_5pct_fpr": at_5pct["precision"],
+    }
+
+    if n_bootstrap > 0:
+        row.update(bootstrap_average_precision(labels, scores, n_resamples=n_bootstrap))
+
+    return row

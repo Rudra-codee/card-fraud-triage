@@ -1,0 +1,7 @@
+model_name,label,split,n_samples,fraud_count,average_precision,recall_at_1pct,actual_fpr_1pct,recall_at_5pct,actual_fpr_5pct
+gmm_baseline,GMM Baseline (K=1 full),validation,56957,57,0.074028,0.736842,0.009947,0.877193,0.05
+gmm_baseline,GMM Baseline (K=1 full),test,56962,75,0.1610349872113048,0.72,0.00664475187652715,0.84,0.04013219188918382
+gmm_k4_full,GMM K=4 Full Covariance,validation,56957,57,0.48396,0.754386,0.009965,0.824561,0.05
+gmm_k4_full,GMM K=4 Full Covariance,test,56962,75,0.5769642246654952,0.76,0.005888867403800517,0.8,0.036844973368256366
+autoencoder_baseline,Autoencoder Baseline,validation,56957,57,0.076527,0.719298,0.01,0.877193,0.05
+autoencoder_baseline,Autoencoder Baseline,test,56962,75,0.17932771388872998,0.7333333333333333,0.005590029356443475,0.8,0.03601877406085749

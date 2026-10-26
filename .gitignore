@@ -22,6 +22,15 @@ results/tables/*
 !results/tables/triage_stability_check.csv
 !results/figures/triage_precision_recall_curve.png
 
+# Final held-out test evaluation outputs (Member 4, Task A)
+!results/tables/final_test_model_comparison.csv
+!results/tables/final_test_threshold_metrics.csv
+!results/tables/final_test_review_capacity.csv
+!results/tables/final_test_val_vs_test_comparison.csv
+!results/tables/final_test_validation_checks.json
+!results/figures/final_test_precision_recall_curve.png
+!results/figures/final_test_review_capacity.png
+
 # OS
 .DS_Store
 

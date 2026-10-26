@@ -3,8 +3,8 @@
 [![Python 3.14 / 3.10+](https://img.shields.io/badge/python-3.14%20%7C%203.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![scikit-learn 1.9.1](https://img.shields.io/badge/scikit--learn-1.9.1-orange.svg)](https://scikit-learn.org/)
 [![PyTorch 2.14.1](https://img.shields.io/badge/PyTorch-2.14.1-red.svg)](https://pytorch.org/)
-[![Status: Validation Comparison Audited](https://img.shields.io/badge/Phase%202-Validation%20Comparison%20Audited-success.svg)](#2-current-milestone-project-status)
-[![Unit Tests: 48 Passing](https://img.shields.io/badge/tests-48%2F48%20passing-brightgreen.svg)](#11-verification-and-automated-test-results)
+[![Status: Final Test Evaluation Completed](https://img.shields.io/badge/Phase%203-Final%20Test%20Evaluation%20Completed-success.svg)](#2-current-milestone-project-status)
+[![Unit Tests: 61 Passing](https://img.shields.io/badge/tests-61%2F61%20passing-brightgreen.svg)](#12-verification-and-automated-test-results)
 
 An academic and research prototype for prioritizing suspicious credit card transactions using semi-supervised / unsupervised anomaly detection. Normal transaction behavior is modeled strictly on legitimate transactions using two distinct paradigms:
 1. **Gaussian Mixture Model (GMM) Density Estimation:** Quantifying statistical rarity via negative log-likelihood (NLL).
@@ -26,11 +26,12 @@ The primary objective is **fraud triage**—ranking transactions to optimize ana
 8. [Deep Autoencoder Anomaly Detection](#8-deep-autoencoder-anomaly-detection)
 9. [GMM Baseline vs. Autoencoder Validation Comparison](#9-gmm-baseline-vs-autoencoder-validation-comparison)
 10. [Anomaly Scoring, Triage Evaluation & Operating Points](#10-anomaly-scoring-triage-evaluation-operating-points)
-11. [Verification and Automated Test Results](#11-verification-and-automated-test-results)
-12. [Setup and Reproducibility](#12-setup-and-reproducibility)
-13. [Limitations & Research Integrity](#13-limitations-research-integrity)
-14. [Team Responsibilities](#14-team-responsibilities)
-15. [Project Roadmap & Completion Checklist](#15-project-roadmap-completion-checklist)
+11. [Final Held-Out Test Evaluation Results](#11-final-held-out-test-evaluation-results)
+12. [Verification and Automated Test Results](#12-verification-and-automated-test-results)
+13. [Setup and Reproducibility](#13-setup-and-reproducibility)
+14. [Limitations & Research Integrity](#14-limitations-research-integrity)
+15. [Team Responsibilities](#15-team-responsibilities)
+16. [Project Roadmap & Completion Checklist](#16-project-roadmap-completion-checklist)
 
 ---
 
@@ -59,7 +60,7 @@ Supervised classification models can overfit to historical fraud topologies and 
 |   Chronological Split (Strategy B: Timestamp Boundary Alignment) ──► split_manifest.csv           |
 |       ├─ Train Split (60%): 170,888 rows (170,528 legit, 360 fraud)                              |
 |       ├─ Val Split   (20%):  56,957 rows ( 56,900 legit,  57 fraud)                              |
-|       └─ Test Split  (20%):  56,962 rows ( 56,887 legit,  75 fraud) [HELD-OUT & UNTOUCHED]        |
+|       └─ Test Split  (20%):  56,962 rows ( 56,887 legit,  75 fraud) [Held-out for evaluation]    |
 |       │                                                                                           |
 |       ▼                                                                                           |
 |   Feature Engineering & Scaling:                                                                  |
@@ -84,13 +85,18 @@ Supervised classification models can overfit to historical fraud topologies and 
 |   Validation Triage Evaluation & Model Comparison (src/triage_evaluation.py)                  |   |
 |   • Average Precision (PR-AUC), Recall @ 1% FPR, Recall @ 5% FPR, Top-N Alert Capacity       |   |
 |   • reports/gmm_vs_autoencoder.md & reports/triage_evaluation.md                              |   |
+|                             │                                                                 |   |
+|                             ▼ (Thresholds and model artifacts frozen)                         |   |
+|   Final Held-Out Test Evaluation (scripts/run_final_test_evaluation.py)                       |   |
+|   • Unbiased benchmark on 56,962 test transactions (75 frauds)                                |   |
+|   • reports/final_test_evaluation.md & results/tables/final_test_*.csv                        |   |
 |                                                                                                   |
 +---------------------------------------------------------------------------------------------------+
 ```
 
 ### Scope & Decision Support Distinction
 * **Ranking, Not Classification:** The goal is prioritizing transactions for analyst investigation, not declaring that every high-scoring transaction is fraud.
-* **Evaluation Independence:** Models are fitted on legitimate training data only; candidate operating thresholds are estimated on the validation partition only; the held-out test partition remains strictly untouched.
+* **Evaluation Independence:** Models are fitted on legitimate training data only; candidate operating thresholds are estimated on the validation partition only; the held-out test partition was strictly preserved during development and evaluated once for the final unbiased benchmark.
 * **Academic Research Prototype:** This repository is an academic coursework implementation. It is not a commercial, production-deployed payment security system and does not claim production latency or operational guarantees.
 
 ---
@@ -107,9 +113,9 @@ Supervised classification models can overfit to historical fraud topologies and 
 | **Triage Evaluation Framework** | **Completed** | Reusable validation evaluation module (`src/triage_evaluation.py`) with Recall@FPR, Average Precision, and Top-N review-capacity analysis. |
 | **Autoencoder Model** | **Completed** | PyTorch symmetric autoencoder ($29 \to 20 \to 10 \to 5 \to 10 \to 20 \to 29$) trained on legitimate training data with legitimate validation monitoring. |
 | **Cross-Model Comparison** | **Completed & Audited** | Direct validation comparison between GMM baseline and Autoencoder baseline documented in [`reports/gmm_vs_autoencoder.md`](reports/gmm_vs_autoencoder.md). |
-| **Automated Test Suite** | **48 / 48 Passing** | Full unit test suite passing in restored `.venv` (`.venv/bin/python -m unittest discover tests`). |
-| **Final Test Set Evaluation** | **HELD OUT** | The 56,962-row test partition has **never been evaluated or accessed**. Preserved for final one-time benchmarking. |
-| **Presentation & Final Viva** | **Pending Confirmation** | Final report consolidation and presentation slide deck in preparation. |
+| **Automated Test Suite** | **61 / 61 Passing** | Full unit test suite passing in restored `.venv` (`.venv/bin/python -m unittest discover tests`). |
+| **Final Test Set Evaluation** | **Completed & Audited** | Final, unbiased evaluation of frozen GMM and Autoencoder models on 56,962 test transactions using frozen validation thresholds; documented in [`reports/final_test_evaluation.md`](reports/final_test_evaluation.md). |
+| **Presentation & Final Viva** | **In Progress** | Final report consolidation and presentation slide deck in preparation. |
 
 ---
 
@@ -132,10 +138,10 @@ Verified against the raw dataset and split manifest:
 Random splits cause future-to-past data leakage. We implement a strict chronological split:
 
 | Partition | Total Rows | Legitimate (`Class == 0`) | Fraud (`Class == 1`) | Fraud Rate | Time Window (s) | Model Usage |
-| :--- | ---: | ---: | ---: | ---: | :--- | :--- |
+| :--- | ---: | ---: | ---: | ---: | ---: | :--- |
 | **Train** | **170,888** | **170,528** | **360** | 0.2107% | 0.0s – 120,396.0s (~33.4h) | **Legitimate rows ONLY** used for parameter fitting |
 | **Validation** | **56,957** | **56,900** | **57** | 0.1001% | 120,397.0s – 145,247.0s (~6.9h) | Early stopping & triage threshold evaluation |
-| **Test** | **56,962** | **56,887** | **75** | 0.1317% | 145,248.0s – 172,792.0s (~7.6h) | **HELD OUT — UNTOUCHED** |
+| **Test** | **56,962** | **56,887** | **75** | 0.1317% | 145,248.0s – 172,792.0s (~7.6h) | **Held out during development; evaluated in final benchmark** |
 | **Total** | **284,807** | **284,315** | **492** | 0.1727% | 0.0s – 172,792.0s (48.0h) | Full dataset preserved |
 
 * **Boundary Alignment:** The nominal 60% index boundary fell within a 1-second burst sharing `Time = 120,396.0s`. The boundary was shifted by 4 rows to index 170,888 to ensure all simultaneous transactions remained in the training split.
@@ -188,9 +194,12 @@ card-fraud-triage/
 │       └── scores/
 │           ├── gmm_baseline_scores_train.csv # 170,888 train scores (row_id, anomaly_score, split)
 │           ├── gmm_baseline_scores_val.csv   # 56,957 val scores (row_id, anomaly_score, split)
+│           ├── gmm_baseline_scores_test.csv  # 56,962 test scores (row_id, anomaly_score, split)
+│           ├── gmm_k4_full_scores_test.csv   # 56,962 test scores for K=4 full GMM
 │           ├── gmm_baseline_scores_metadata.json # GMM score distribution statistics
 │           ├── autoencoder_scores_train.csv  # 170,888 train reconstruction error scores
-│           └── autoencoder_scores_val.csv    # 56,957 val reconstruction error scores
+│           ├── autoencoder_scores_val.csv    # 56,957 val reconstruction error scores
+│           └── autoencoder_scores_test.csv   # 56,962 test reconstruction error scores
 │
 ├── models/
 │   ├── gmm_baseline.joblib                 # Frozen 1-component full-covariance GMM (21.5 KB)
@@ -214,24 +223,33 @@ card-fraud-triage/
 │   ├── gmm_model_selection.md              # 12-model GMM grid, AIC/BIC analysis, seed audit
 │   ├── triage_evaluation.md                # Validation triage metrics, FPR thresholds, review budgets
 │   ├── autoencoder_baseline.md             # Autoencoder training, architecture, and score audit
-│   └── gmm_vs_autoencoder.md               # Cross-model validation comparison and trade-offs
+│   ├── gmm_vs_autoencoder.md               # Cross-model validation comparison and trade-offs
+│   └── final_test_evaluation.md            # Final held-out test evaluation benchmark report
 │
 ├── results/
 │   ├── figures/
-│   │   └── triage_precision_recall_curve.png # Precision-recall curves across evaluated models
+│   │   ├── triage_precision_recall_curve.png # Validation precision-recall curves
+│   │   ├── final_test_precision_recall_curve.png # Final test precision-recall curves
+│   │   └── final_test_review_capacity.png    # Test fraud triage by review capacity
 │   └── tables/
-│       ├── triage_model_comparison.csv     # Model comparison across AP, Recall@FPR, precision
-│       ├── triage_fpr_thresholds.csv       # FPR-constrained threshold operating points
-│       ├── triage_review_capacity.csv      # Top-N review budget operating points
+│       ├── triage_model_comparison.csv     # Validation model comparison across AP, Recall@FPR
+│       ├── triage_fpr_thresholds.csv       # Validation FPR-constrained threshold operating points
+│       ├── triage_review_capacity.csv      # Validation top-N review budget operating points
 │       ├── triage_stability_check.csv      # Seed and regularization sensitivity evaluation
-│       └── triage_validation_checks.json   # Automated integrity and validation check outputs
+│       ├── triage_validation_checks.json   # Automated validation integrity check outputs
+│       ├── final_test_model_comparison.csv # Final test model comparison (AP, Recall@FPR, precision)
+│       ├── final_test_threshold_metrics.csv # Final test metrics at frozen validation thresholds
+│       ├── final_test_review_capacity.csv  # Final test top-N review capacity (Top 50..500)
+│       ├── final_test_val_vs_test_comparison.csv # Side-by-side validation vs test comparison
+│       └── final_test_validation_checks.json # Final test integrity audit and checks
 │
 ├── scripts/
 │   ├── audit_stability.py                  # Numerical stability and condition number audit
 │   ├── generate_notebook.py                # Notebook generation utility
 │   ├── run_model_selection.py              # Executes 12-candidate GMM grid search and exports models
 │   ├── run_triage_evaluation.py            # Executes validation triage evaluation suite
-│   └── run_autoencoder.py                  # Trains Autoencoder, exports scores, logs metadata
+│   ├── run_autoencoder.py                  # Trains Autoencoder, exports scores, logs metadata
+│   └── run_final_test_evaluation.py        # Executes final held-out test evaluation benchmark
 │
 ├── src/
 │   ├── create_split.py                     # Deterministic chronological split generator
@@ -239,7 +257,7 @@ card-fraud-triage/
 │   ├── gmm_model.py                        # GMM baseline configuration, fitting, and persistence
 │   ├── scoring.py                          # Negative log-likelihood scoring and CSV export
 │   ├── model_selection.py                  # GMM grid training, AIC/BIC, candidate evaluation
-│   ├── triage_evaluation.py                # Reusable validation metrics, FPR thresholds, AP
+│   ├── triage_evaluation.py                # Reusable triage metrics, frozen threshold evaluation
 │   ├── autoencoder_model.py                # PyTorch Autoencoder architecture and training loop
 │   └── autoencoder_scoring.py              # Autoencoder MSE scoring and score CSV export
 │
@@ -247,7 +265,8 @@ card-fraud-triage/
     ├── test_gmm_baseline.py                # 11 tests: GMM baseline training, leakage, stability
     ├── test_model_selection.py             # 2 tests: Candidate fitting and triage metrics
     ├── test_triage_evaluation.py           # 27 tests: AP, Recall@FPR, ties, row alignment, budgets
-    └── test_autoencoder.py                 # 8 tests: AE architecture, training, MSE, early stopping
+    ├── test_autoencoder.py                 # 8 tests: AE architecture, training, MSE, early stopping
+    └── test_final_test_evaluation.py       # 13 tests: Test integrity, frozen thresholds, zero refit
 ```
 
 ---
@@ -399,7 +418,7 @@ Both models were audited and compared on the **identical validation partition** 
 1. **Average Precision:** The Autoencoder's AP (`0.0765`) exceeds the GMM baseline (`0.0740`) by 0.0025 points. Both are ~7–8× higher than random guessing ($\approx 0.0010$). With only 57 fraud cases, this margin is within natural sampling variance and does not establish overall superiority.
 2. **Tight Operating Budget (1% FPR):** The GMM baseline catches 42 of 57 frauds versus 41 of 57 for the Autoencoder, providing a slight advantage when analyst investigation budgets are tightest.
 3. **Moderate Operating Budget (5% FPR):** Both models achieve identical recall, capturing 50 of 57 frauds and flagging exactly 2,845 false positives. The 7 uncaught frauds overlap heavily with legitimate data under both representations.
-4. **Generalization Caveat:** These results represent validation partition performance only. Neither model has been evaluated on the held-out test partition.
+4. **Generalization Note:** These initial comparison figures were measured on the validation partition only. The subsequent Section 11 presents the final, unbiased evaluation on the held-out test partition.
 
 ---
 
@@ -412,16 +431,111 @@ Scores are stored with their `row_id`. In evaluation, rows are joined back to gr
 
 ### 2. Operating Point Constraints
 * **Fixed False Positive Rate (FPR $\le \alpha$):**
-  * Denominator: strictly legitimate validation rows ($N = 56,900$).
+  * Denominator: strictly legitimate rows ($N = 56,900$ in validation, $N = 56,887$ in test).
   * Threshold selection: `roc_curve(drop_intermediate=False)` is used to identify distinct score thresholds. The algorithm selects the **lowest threshold that keeps FPR $\le \alpha$**.
   * **Tie-Handling Rule:** If including a group of tied scores causes FPR to exceed the budget, the entire group remains unflagged. Achieved FPR is guaranteed to stay $\le \alpha$.
 * **Fixed Analyst Review Budget (Top-N Alerts):**
-  * Flags the top $N$ highest-scoring transactions ($N \in \{50, 100, 200, 500, 570\}$).
+  * Flags the top $N$ highest-scoring transactions ($N \in \{50, 100, 200, 500\}$).
   * Evaluates true positives (frauds caught) and achieved precision under fixed operational review capacity.
 
 ---
 
-## 11. Verification and Automated Test Results
+## 11. Final Held-Out Test Evaluation Results
+
+The final, unbiased evaluation was executed on the chronological held-out test partition ($N = 56,962$ transactions, $75$ fraud cases, $0.1317\%$ fraud prevalence) using the frozen model artifacts and frozen validation-derived thresholds. Full documentation and diagnostics are available in [`reports/final_test_evaluation.md`](reports/final_test_evaluation.md).
+
+### 11.1 Methodological Rigor & Threshold Provenance
+* **Zero Test Retraining:** Preprocessing parameters (`StandardScaler`) and model parameters were frozen.
+* **Frozen Threshold Rule:** Operating thresholds were selected strictly on the validation partition to meet $1\%$ and $5\%$ FPR targets, then applied directly to test anomaly scores. **No threshold tuning was performed on test labels.**
+* **Decoupled Scoring:** Anomaly scores were generated from $X_{\text{test}}$ alone without access to target labels.
+* **Verified Threshold Values:**
+  * **GMM Baseline:** $1\%$ FPR threshold = `158.814`, $5\%$ FPR threshold = `60.726` (NLL units).
+  * **GMM $K=4$ Full:** $1\%$ FPR threshold = `66.436`, $5\%$ FPR threshold = `50.241` (NLL units).
+  * **Autoencoder Baseline:** $1\%$ FPR threshold = `2.651`, $5\%$ FPR threshold = `1.341` (MSE units).
+
+### 11.2 Comprehensive Model Comparison on Held-Out Test Partition
+
+Evaluated across the 56,962 test transactions ($56,887$ legitimate, $75$ fraud):
+
+| Metric | Frozen GMM Baseline | Frozen GMM $K=4$ Full | Frozen Autoencoder Baseline |
+| :--- | :---: | :---: | :---: |
+| **Model Artifact** | `models/gmm_baseline.joblib` | `models/candidates/gmm_k4_full.joblib` | `models/autoencoder_baseline.pt` |
+| **Model Architecture** | $K=1$, full covariance (464 params) | $K=4$, full covariance (1,859 params) | $29 \to 20 \to 10 \to 5 \to 10 \to 20 \to 29$ (1,929 params) |
+| **Average Precision (AP)** | **0.1610** | **0.5770** | **0.1793** |
+| └ 95% Bootstrap CI | [0.1208, 0.2209] | [0.4588, 0.6973] | [0.1318, 0.2447] |
+| **ROC-AUC** | **0.9622** | **0.9156** | **0.9436** |
+| **Recall @ Frozen 1% Val Thresh** | **72.00% (54 / 75)** | **76.00% (57 / 75)** | **73.33% (55 / 75)** |
+| └ Operating Threshold | 158.814 | 66.436 | 2.651 |
+| └ Actual Test FPR | 0.6645% (378 FP) | 0.5889% (335 FP) | 0.5590% (318 FP) |
+| └ Alerts & Precision | 432 alerts (12.50%) | 392 alerts (14.54%) | 373 alerts (14.75%) |
+| **Recall @ Frozen 5% Val Thresh** | **84.00% (63 / 75)** | **80.00% (60 / 75)** | **80.00% (60 / 75)** |
+| └ Operating Threshold | 60.726 | 50.241 | 1.341 |
+| └ Actual Test FPR | 4.0132% (2,283 FP) | 3.6845% (2,096 FP) | 3.6019% (2,049 FP) |
+| └ Alerts & Precision | 2,346 alerts (2.69%) | 2,156 alerts (2.78%) | 2,109 alerts (2.84%) |
+
+*Serialized outputs:* [`results/tables/final_test_model_comparison.csv`](results/tables/final_test_model_comparison.csv) and [`results/tables/final_test_threshold_metrics.csv`](results/tables/final_test_threshold_metrics.csv).
+
+### 11.3 Fixed Operational Review Capacity (Top-$N$ Alerts)
+
+Measuring triage utility when investigation capacity is constrained to top-$N$ ranked alerts:
+
+| Review Budget | Metric | GMM Baseline | GMM $K=4$ Full | Autoencoder Baseline |
+| :--- | :--- | :---: | :---: | :---: |
+| **Top 50 Alerts** | Frauds Caught | 9 / 75 | **39 / 75** | 11 / 75 |
+| | Precision | 18.00% | **78.00%** | 22.00% |
+| | Recall | 12.00% | **52.00%** | 14.67% |
+| | False Positives | 41 | **11** | 39 |
+| **Top 100 Alerts** | Frauds Caught | 28 / 75 | **49 / 75** | 31 / 75 |
+| | Precision | 28.00% | **49.00%** | 31.00% |
+| | Recall | 37.33% | **65.33%** | 41.33% |
+| | False Positives | 72 | **51** | 69 |
+| **Top 200 Alerts** | Frauds Caught | 38 / 75 | **55 / 75** | 40 / 75 |
+| | Precision | 19.00% | **27.50%** | 20.00% |
+| | Recall | 50.67% | **73.33%** | 53.33% |
+| | False Positives | 162 | **145** | 160 |
+| **Top 500 Alerts** | Frauds Caught | 56 / 75 | **57 / 75** | 56 / 75 |
+| | Precision | 11.20% | **11.40%** | 11.20% |
+| | Recall | 74.67% | **76.00%** | 74.67% |
+| | False Positives | 444 | **443** | 444 |
+
+*Serialized output:* [`results/tables/final_test_review_capacity.csv`](results/tables/final_test_review_capacity.csv).
+*Figure:* [`results/figures/final_test_review_capacity.png`](results/figures/final_test_review_capacity.png).
+
+### 11.4 Validation vs. Test Generalization
+
+| Model | Split | Transactions | Fraud Count | AP | Recall @ 1% Thresh | Actual FPR @ 1% | Recall @ 5% Thresh | Actual FPR @ 5% |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **GMM Baseline** | Validation | 56,957 | 57 | 0.0740 | 73.68% (42/57) | 0.9947% | 87.72% (50/57) | 5.0000% |
+| | **Test** | **56,962** | **75** | **0.1610** | **72.00% (54/75)** | **0.6645%** | **84.00% (63/75)** | **4.0132%** |
+| **GMM $K=4$ Full** | Validation | 56,957 | 57 | 0.4840 | 75.44% (43/57) | 0.9965% | 82.46% (47/57) | 5.0000% |
+| | **Test** | **56,962** | **75** | **0.5770** | **76.00% (57/75)** | **0.5889%** | **80.00% (60/75)** | **3.6845%** |
+| **Autoencoder** | Validation | 56,957 | 57 | 0.0765 | 71.93% (41/57) | 1.0000% | 87.72% (50/57) | 5.0000% |
+| | **Test** | **56,962** | **75** | **0.1793** | **73.33% (55/75)** | **0.5590%** | **80.00% (60/75)** | **3.6019%** |
+
+*Serialized comparison:* [`results/tables/final_test_val_vs_test_comparison.csv`](results/tables/final_test_val_vs_test_comparison.csv).
+
+### 11.5 Detailed Discussion & Technical Synthesis
+
+1. **Did the GMM $K=4$ Advantage Hold?**
+   * **Yes, on this frozen artifact:** The saved seed-42 $K=4$ full-covariance candidate maintained a decisive advantage in Average Precision ($0.5770$ vs. $0.1610$ for baseline and $0.1793$ for AE).
+   * **Tight Review Budget Dominance:** For investigations capped at 50 alerts, $K=4$ captured **39 of 75 frauds with 78.00% precision**, compared to 9 frauds (18.00%) for the GMM baseline and 11 frauds (22.00%) for the Autoencoder.
+   * **Essential Seed-Sensitivity Caveat:** As established during model selection ([`reports/gmm_model_selection.md`](reports/gmm_model_selection.md)), full-covariance GMMs with $K \ge 2$ suffer from non-convex EM optimization and severe seed instability (validation AP ranged from 0.048 to 0.484 across initializations). While the saved seed-42 artifact generalized exceptionally well on the test partition, this mode cannot be guaranteed in automated retraining pipelines without seed pinning or validation-based checkpointing.
+
+2. **Heavy-Tail Coverage at Wider Operating Budgets:**
+   * At the 5% FPR threshold, the simpler single-component **GMM Baseline achieved the highest overall recall: 84.00% (63 of 75 frauds)**, intercepting 3 more frauds than $K=4$ (60/75, 80.00%) and the Autoencoder (60/75, 80.00%).
+   * Unimodal full-covariance scoring applies a smooth Mahalanobis quadratic distance penalty that flags severe multi-feature outliers reliably, whereas mixture components can occasionally assign intermediate likelihoods to unusual spending profiles.
+
+3. **Autoencoder Generalization:**
+   * The Autoencoder achieved a slightly higher test AP than the GMM baseline ($0.1793$ vs. $0.1610$), with overlapping 95% bootstrap confidence intervals ([0.1318, 0.2447] vs. [0.1208, 0.2209]).
+   * It caught slightly more frauds at Top 50 (11 vs. 9) and Top 100 (31 vs. 28), but required ~4.2× more parameters and ~8.5× longer training time.
+
+4. **Operating Point Stability:**
+   * Thresholds selected on validation data proved conservative on test data: actual test FPR was **0.56% to 0.66%** at the nominal 1% target, and **3.60% to 4.01%** at the nominal 5% target.
+   * This confirms that validation-frozen thresholds do not produce runaway false alarm rates on unseen chronological data.
+
+---
+
+## 12. Verification and Automated Test Results
 
 The repository features an automated test suite verifying data hygiene, model convergence, score finiteness, and evaluation correctness:
 
@@ -429,12 +543,12 @@ The repository features an automated test suite verifying data hygiene, model co
 .venv/bin/python -m unittest discover tests
 ```
 
-### Test Suite Execution Summary (48 Passing Tests)
+### Test Suite Execution Summary (61 Passing Tests)
 
 ```text
-................................................
+.............................................................
 ----------------------------------------------------------------------
-Ran 48 tests in 14.502s
+Ran 61 tests in 7.541s
 
 OK
 ```
@@ -461,10 +575,19 @@ OK
   * Top-N analyst alert budget boundary tests.
   * Row-ID shuffle resistance and score-label alignment.
   * Frozen baseline rescore reproducibility.
+* **[`tests/test_final_test_evaluation.py`](tests/test_final_test_evaluation.py) (13 tests):**
+  * Missing, duplicate, and extraneous row-ID detection.
+  * Score and label alignment invariance after row shuffling.
+  * Rejection of non-finite scores (NaN, $\pm\infty$).
+  * Frozen threshold evaluation without retuning from test labels.
+  * Legitimate-only denominator verification for test FPR computation.
+  * Alert budget compliance and deterministic tie-dropping policy.
+  * Zero model-fitting or scaler-fitting execution during evaluation.
+  * Backward compatibility of validation evaluation functions.
 
 ---
 
-## 12. Setup and Reproducibility
+## 13. Setup and Reproducibility
 
 ### Prerequisites
 * macOS (Apple Silicon ARM64 verified) or Linux
@@ -489,7 +612,7 @@ source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# 5. Run complete test suite (48 tests)
+# 5. Run complete test suite (61 tests)
 python -m unittest discover tests
 ```
 
@@ -500,7 +623,7 @@ All artifacts and scores are checked into the repository for instant reproductio
   ```bash
   python scripts/run_model_selection.py
   ```
-* **Run Triage Evaluation & Review-Capacity Analysis:**
+* **Run Validation Triage Evaluation & Review-Capacity Analysis:**
   ```bash
   python scripts/run_triage_evaluation.py
   ```
@@ -508,33 +631,37 @@ All artifacts and scores are checked into the repository for instant reproductio
   ```bash
   python scripts/run_autoencoder.py
   ```
+* **Run Final Held-Out Test Evaluation Benchmark:**
+  ```bash
+  python scripts/run_final_test_evaluation.py
+  ```
 
 ---
 
-## 13. Limitations & Research Integrity
+## 14. Limitations & Research Integrity
 
-1. **Extreme Class Imbalance:** Fraud represents only 0.1727% of transactions overall and 0.1001% (57 cases) in the validation set. With only 57 validation fraud cases, catching or missing a single fraud shifts recall by $1.75\%$.
+1. **Extreme Class Imbalance:** Fraud represents only 0.1727% of transactions overall, 0.1001% (57 cases) in validation, and 0.1317% (75 cases) in test. A shift of 3 caught frauds alters test recall by 4.0 percentage points.
 2. **Anomaly Rarity vs. Fraudulent Intent:** Statistical anomaly detection identifies transactions that deviate from normal spending distributions. High-value legitimate transactions, unusual travel expenses, or rare merchant codes can produce high anomaly scores without being fraudulent.
-3. **Incompatible Score Scales:** GMM negative log-likelihood scores ($-\ln p(x)$, range $\approx 28$ to $5,200+$) cannot be directly compared in numerical magnitude to Autoencoder MSE scores ($\approx 0.06$ to $170+$). They can only be compared through unified operating constraints (such as fixed FPR thresholds).
-4. **Seed Sensitivity in Multi-Component GMMs:** Multi-component GMMs ($K \ge 2$) have non-convex likelihood surfaces. While $K=4$ under seed 42 yielded an AP of 0.4840, other initializations converged to solutions with AP 0.07–0.10. Unvalidated candidate performance must be viewed with caution.
-5. **Validation vs. Test Generalization:** All reported triage metrics, PR curves, and operating thresholds are derived from the **validation partition only**. Validation results do not establish generalization to unseen future data. The held-out test partition is strictly reserved for final, unbiased benchmarking.
+3. **Incompatible Score Scales:** GMM negative log-likelihood scores ($-\ln p(x)$, range $\approx 28$ to $5,200+$) cannot be directly compared in numerical magnitude to Autoencoder MSE scores ($\approx 0.06$ to $170+$). They can only be compared through unified operating constraints (such as fixed FPR thresholds or review budgets).
+4. **Seed Sensitivity in Multi-Component GMMs:** Multi-component GMMs ($K \ge 2$) have non-convex likelihood surfaces. While $K=4$ under seed 42 yielded exceptional test performance, other initializations converged to lower AP solutions. Unvalidated candidate performance must be viewed with caution.
+5. **Validation vs. Test Generalization:** Operating thresholds were determined on validation data and evaluated once on the test set. While generalization held well on this 48-hour time series, results from a single dataset do not guarantee performance across different financial institutions or fraud seasons.
 6. **Prototype Status:** This system is an academic research prototype. It does not provide sub-50ms latency guarantees, merchant graph profiling, or streaming state handling necessary for production payment rails.
 
 ---
 
-## 14. Team Responsibilities
+## 15. Team Responsibilities
 
 | Member | Name | Primary Project Responsibilities | Verified Deliverable Status |
 | :---: | :--- | :--- | :--- |
 | **Member 1** | **Rudraksh** | GMM baseline implementation, legitimate-only training protocol, anomaly scoring, Autoencoder core model implementation, technical integration, and test suite. | **Completed & Verified** (GMM baseline frozen, Autoencoder implementation in `src/autoencoder_model.py`, passing tests). |
 | **Member 2** | **Bhargav** | Dataset verification, exploratory data analysis, chronological split strategy (Strategy B), feature engineering (`log1p(Amount)`), and leak-free `StandardScaler`. | **Completed & Verified** (EDA notebook, `split_manifest.csv`, `src/preprocessing.py`). |
 | **Member 3** | **Kaustubh** | GMM model selection: component counts ($K \in \{2, 3, 4, 5\}$), covariance structures (`full`, `diag`, `tied`), AIC/BIC analysis, and seed stability audit. | **Completed & Verified** (12 candidate models, `reports/gmm_model_selection.md`, `run_model_selection.py`). |
-| **Member 4** | **Anurag** | Triage evaluation: Average Precision (PR-AUC), fixed-FPR recall, Top-N review capacity, threshold tie-handling, and cross-model comparison. | **Completed & Verified** (`src/triage_evaluation.py`, `reports/triage_evaluation.md`, `results/tables/`). |
+| **Member 4** | **Anurag** | Triage evaluation: Average Precision (PR-AUC), fixed-FPR recall, Top-N review capacity, threshold tie-handling, cross-model comparison, and final held-out test evaluation. | **Completed & Verified** (`src/triage_evaluation.py`, `scripts/run_final_test_evaluation.py`, `reports/final_test_evaluation.md`, `results/tables/final_test_*.csv`, `tests/test_final_test_evaluation.py`). |
 | **Member 5** | **Pratyush** | Autoencoder validation evaluation and comparison, project documentation consolidation, final academic report synthesis, and presentation slide deck. | **Completed & In Progress** (`reports/gmm_vs_autoencoder.md` verified; final report & presentation pending confirmation). |
 
 ---
 
-## 15. Project Roadmap & Completion Checklist
+## 16. Project Roadmap & Completion Checklist
 
 - [x] **Milestone 0: Dataset Audit & Preprocessing**
   - [x] Exploratory data analysis and missing value audit ([`reports/data_cleaning_decisions.md`](reports/data_cleaning_decisions.md))
@@ -563,11 +690,13 @@ All artifacts and scores are checked into the repository for instant reproductio
   - [x] Operating point analysis at 1% FPR and 5% FPR
   - [x] Audited comparison report ([`reports/gmm_vs_autoencoder.md`](reports/gmm_vs_autoencoder.md))
 - [x] **Milestone 6: Verification & Automated Test Suite**
-  - [x] Comprehensive 48-test automated suite across all 4 modules (`tests/`)
+  - [x] Comprehensive 61-test automated suite across all 5 test modules (`tests/`)
   - [x] Clean pass verification (`.venv/bin/python -m unittest discover tests`)
 - [x] **Milestone 7: Final Held-Out Test Set Evaluation**
   - [x] One-time unbiased evaluation of frozen candidate models on the 56,962-row test partition
   - [x] Final generalization benchmarking against validation operating points
-- [x] **Milestone 8: Final Academic Report & Presentation**
-  - [x] Synthesis of consolidated project viva report
-  - [x] Final presentation slide deck preparation and defense coordination
+  - [x] Exported test scores, comparison tables, review capacity metrics, and plots
+  - [x] Final evaluation report documented in [`reports/final_test_evaluation.md`](reports/final_test_evaluation.md)
+- [ ] **Milestone 8: Final Academic Report & Presentation**
+  - [ ] Synthesis of consolidated project viva report
+  - [ ] Final presentation slide deck preparation and defense coordination
