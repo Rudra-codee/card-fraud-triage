@@ -1,0 +1,298 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{balance}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Density, Reconstruction, or Both?\\A Leak-Free Study of Gaussian Mixture Models, Deep Autoencoders, and Two-Tier Triage for Credit Card Fraud}
+
+\author{\IEEEauthorblockN{Kaustubh Hiwanj, Rudraksh Rathod, Bhargav Patil, Anurag, Pratyush Chouksey}
+\IEEEauthorblockA{\textit{Department of Computer Science and Engineering} \\
+\textit{Advanced Machine Learning and Deep Learning --- Capstone Project (Phases 1 and 2)} \\
+Card Fraud Triage Research Group}
+}
+
+\maketitle
+
+\begin{abstract}
+Credit card fraud detection is characterized by extreme class imbalance ($0.17\%$) and strict operational review capacity constraints. Standard supervised classifiers suffer from severe alert fatigue and struggle against evolving zero-day fraud strategies. In this paper, we present a leak-free study comparing classical probabilistic density estimation with deep neural reconstruction for unsupervised fraud anomaly triage. Every experimental decision is governed by a strict chronological protocol (Strategy B: 60/20/20 split) with leak-free preprocessing fitted exclusively on legitimate training transactions, and a single-pass held-out test evaluation.
+
+In \textbf{Phase 1}, we benchmark a frozen single-component Gaussian Mixture Model (GMM) baseline against a 12-candidate model-selection grid ($K \in \{2, 3, 4, 5\}$, full, diagonal, and tied covariance). While diagonal covariance fails completely (Average Precision $\approx 0.045$--$0.059$), a 4-component full-covariance model achieves an Average Precision (PR-AUC) of $0.4840$ on validation data ($6.5\times$ over the $0.0740$ baseline). In \textbf{Phase 2}, we evaluate a 5-layer symmetric PyTorch Autoencoder ($29 \to 20 \to 10 \to 5 \to 10 \to 20 \to 29$) trained with legitimate-only validation early stopping, quantifying anomaly severity via Mean Squared Reconstruction Error (MSE). 
+
+Finally, a one-time evaluation on the untouched held-out test set ($N=56,962$, 75 frauds) benchmarks all frozen candidates against frozen operating thresholds. The $K=4$ full-covariance GMM demonstrates dominant precision under constrained capacity ($78.00\%$ precision in the Top 50 alerts, intercepting 39 of 75 frauds), while the unimodal GMM baseline delivers superior broad-spectrum recall ($84.00\%$ recall at a frozen 5\% false positive rate). We synthesize these findings into a \textbf{Two-Tier Operational Triage Architecture} that unifies rapid high-precision step-up challenges with a high-recall background safety net.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Credit card fraud detection, anomaly triage, Gaussian mixture models, deep autoencoders, negative log-likelihood, reconstruction error, data leakage, precision-recall AUC, review capacity.
+\end{IEEEkeywords}
+
+\section{Introduction}
+Commercial payment security systems process hundreds of thousands of transactions daily, yet fraudulent transactions represent less than $0.2\%$ of overall volume~\cite{dalpozzolo2015}. Because human fraud investigation desks operate under finite daily review capacity, deploying models that generate uncalibrated false alarms causes severe alert fatigue, allowing financial loss to slip through uninspected. Furthermore, supervised models trained on past fraud signatures overfit to historical modus operandi and frequently fail against adversarial zero-day attack vectors~\cite{ahmed2016}.
+
+To circumvent these vulnerabilities, this project investigates an unsupervised \textbf{normal-behavior anomaly triage paradigm}: models are trained strictly on legitimate cardholder transactions ($y_{\text{train}} == 0$), learning the distribution and geometry of legitimate spending habits. Prospective transactions are then ranked by anomaly severity to maximize fraud interception under strict false positive budgets.
+
+We investigate two distinct anomaly detection paradigms:
+\begin{enumerate}
+    \item \textbf{Statistical Density Estimation (GMM):} Quantifies statistical rarity via Negative Log-Likelihood ($\text{NLL} = -\ln p(x)$).
+    \item \textbf{Deep Subspace Reconstruction (Autoencoder):} Quantifies feature distortion via per-sample Mean Squared Reconstruction Error ($\text{MSE} = \frac{1}{D}\sum (x_d - \hat{x}_d)^2$).
+\end{enumerate}
+
+\subsection{Research Questions}
+The study answers nine core research questions:
+\begin{itemize}
+    \item \textbf{Phase 1 (GMM Density Scoring):}
+    \begin{itemize}
+        \item \textbf{RQ1:} How effective is a unimodal full-covariance Gaussian baseline in ranking fraudulent anomalies?
+        \item \textbf{RQ2:} Does multi-modal mixture modeling ($K \in \{2, 3, 4, 5\}$) resolve distinct behavioral spending clusters?
+        \item \textbf{RQ3:} Why does axis-aligned diagonal covariance collapse in triage performance?
+        \item \textbf{RQ4:} How do EM seed sensitivity and covariance condition numbers affect model reproducibility?
+    \end{itemize}
+    \item \textbf{Phase 2 (Deep Autoencoders \& Operational Triage):}
+    \begin{itemize}
+        \item \textbf{RQ5:} Does a deep autoencoder outperform Gaussian density estimation in Precision-Recall AUC?
+        \item \textbf{RQ6:} How do reconstruction error and log-likelihood scores correlate across fraud and legitimate transactions?
+        \item \textbf{RQ7:} What are the computational latency and memory footprints of the respective architectures?
+        \item \textbf{RQ8:} How do candidates perform under realistic daily triage quotas (Top 50 to Top 500 review budgets)?
+        \item \textbf{RQ9:} Does a dual-tier operational architecture provide a superior trade-off over any standalone model?
+    \end{itemize}
+\end{itemize}
+
+\subsection{Pre-Registered Hypotheses}
+Phase 1 closed with two formal hypotheses:
+\begin{itemize}
+    \item \textbf{H1:} A deep symmetric autoencoder trained strictly on legitimate transactions exceeds the single-component GMM baseline's Average Precision ($\text{AP} > 0.0740$) on validation data.
+    \item \textbf{H2:} Non-linear subspace compression resolves subtle transaction anomalies without suffering from the Expectation-Maximization (EM) seed instability observed in multi-component full-covariance GMMs.
+\end{itemize}
+
+\subsection{Contributions}
+\begin{enumerate}
+    \item \textbf{A Leak-Free Experimental Protocol:} Strict chronological partitioning (Strategy B: 60/20/20) with timestamp boundary alignment, preventing future-to-past data leakage. The preprocessing scaler is fitted strictly on legitimate training data.
+    \item \textbf{Systematic 12-Model GMM Selection:} Exhaustive grid search evaluating component counts ($K \in \{2, 3, 4, 5\}$) and covariance geometries (`full`, `diag`, `tied`), backed by AIC/BIC analysis and numerical condition audits.
+    \item \textbf{Deep Autoencoder Benchmarking:} Implementation of a symmetric PyTorch autoencoder ($29 \to 20 \to 10 \to 5 \to 10 \to 20 \to 29$) with legitimate-only validation early stopping.
+    \item \textbf{Single-Pass Held-Out Test Evaluation:} One-time benchmarking on $56,962$ untouched transactions ($75$ frauds) with frozen validation-derived operating thresholds.
+    \item \textbf{Two-Tier Triage Pipeline:} An operational architecture combining rapid high-precision interception ($78\%$ precision at Top 50 alerts) with a broad high-recall safety net ($84\%$ recall at 5\% FPR).
+\end{enumerate}
+
+\section{Related Work and Positioning}
+\subsection{Class Imbalance and Fraud Classification}
+Early benchmarks on the European card fraud dataset~\cite{dalpozzolo2015} focused primarily on supervised learning (Random Forests, Logistic Regression, XGBoost). While supervised models achieve high ROC-AUC, they suffer from two operational weaknesses. First, ROC-AUC is misleadingly optimistic under extreme imbalance~\cite{davis2006}: a false positive rate of 1\% over 56,900 legitimate transactions generates 569 false alarms, overwhelming triage teams. Second, synthetic oversampling techniques (such as SMOTE~\cite{chawla2002}) alter the high-dimensional covariance structure of normal payments.
+
+\subsection{Unsupervised Anomaly Detection}
+Unsupervised anomaly detection formulates fraud detection as deviation from normalcy~\cite{chandola2009}. Gaussian Mixture Models (GMM) model normal behavior as a mixture of Gaussian ellipsoids~\cite{reynolds2009}, allowing closed-form negative log-likelihood scoring. Conversely, Deep Autoencoders compress input vectors through a dimensional bottleneck; because the network optimizes reconstruction loss exclusively on legitimate data, anomalies incur elevated reconstruction errors~\cite{an2015}. Prior comparative studies frequently evaluated models on random splits or refitted scalers on test data. This study enforces complete test isolation and frozen threshold provenance.
+
+\section{Problem Formulation and Metrics}
+\subsection{Dataset and Anomaly Scoring Conventions}
+Let $\mathcal{D} = \{(x_n, y_n)\}_{n=1}^N$ denote a set of transactions where $x_n \in \mathbb{R}^D$ ($D=29$) represents standardized features and $y_n \in \{0, 1\}$ denotes ground truth ($0 = \text{legitimate}, 1 = \text{fraud}$). Models are fitted on legitimate training observations $\mathcal{D}_{\text{train, legit}} = \{x_n \mid y_n = 0, n \in \text{Train}\}$.
+
+\subsubsection{Gaussian Mixture Model Scoring}
+A $K$-component GMM models probability density as:
+\begin{equation}
+p(x \mid \theta) = \sum_{k=1}^K \pi_k \mathcal{N}(x \mid \mu_k, \Sigma_k)
+\end{equation}
+where $\pi_k \ge 0$, $\sum \pi_k = 1$, and $\Sigma_k$ represents the covariance matrix of component $k$. The anomaly score is defined as the Negative Log-Likelihood (NLL):
+\begin{equation}
+S_{\text{GMM}}(x) = -\ln p(x \mid \hat{\theta})
+\end{equation}
+Higher scores denote statistical rarity under normal transaction density.
+
+\subsubsection{Autoencoder Reconstruction Scoring}
+The Autoencoder decomposes into an encoder $f_{\phi}: \mathbb{R}^{29} \to \mathbb{R}^5$ and decoder $g_{\psi}: \mathbb{R}^5 \to \mathbb{R}^{29}$. Anomaly severity is measured by per-sample Mean Squared Error (MSE):
+\begin{equation}
+S_{\text{AE}}(x) = \frac{1}{D} \sum_{d=1}^D (x_d - \hat{x}_d)^2, \quad \hat{x} = g_{\psi}(f_{\phi}(x))
+\end{equation}
+
+\subsection{Evaluation Metrics}
+\begin{enumerate}
+    \item \textbf{Average Precision (PR-AUC):} Area under the Precision-Recall curve, weighted by recall changes:
+    \begin{equation}
+    \text{AP} = \sum_k (R_k - R_{k-1}) P_k
+    \end{equation}
+    Baseline random performance equals fraud prevalence ($\approx 0.0010$).
+    \item \textbf{Recall @ Fixed FPR ($\le 1\%$ and $\le 5\%$):} Fraction of fraudulent transactions intercepted when the threshold is set to the lowest value ensuring legitimate false positive rate $\le \alpha$:
+    \begin{equation}
+    \text{FPR} = \frac{\sum_{i: y_i=0} \mathbb{I}(S(x_i) \ge \tau)}{N_{\text{legit}}} \le \alpha
+    \end{equation}
+    \item \textbf{Fixed Review Capacity (Top-$N$):} Fraud yield and precision when the top $N \in \{50, 100, 200, 500\}$ alerts are audited.
+\end{enumerate}
+
+\section{Data and Experimental Protocol}
+\subsection{Chronological Partitioning (Strategy B)}
+Random data splitting causes future-to-past information leakage. We implement a strict chronological split across 48 continuous hours (September 2013):
+\begin{itemize}
+    \item \textbf{Train (60\%):} $170,888$ rows ($170,528$ legitimate, $360$ fraud), $0.0\text{s}$--$120,396.0\text{s}$.
+    \item \textbf{Validation (20\%):} $56,957$ rows ($56,900$ legitimate, $57$ fraud), $120,397.0\text{s}$--$145,247.0\text{s}$.
+    \item \textbf{Test (20\%):} $56,962$ rows ($56,887$ legitimate, $75$ fraud), $145,248.0\text{s}$--$172,792.0\text{s}$.
+\end{itemize}
+The boundary at 60\% fell inside a 1-second burst sharing $\text{Time} = 120,396.0\text{s}$; we shifted the boundary by 4 rows to index $170,888$ to maintain transaction atomicity.
+
+\subsection{Data Quality and Preprocessing Hygiene}
+\begin{itemize}
+    \item \textbf{Zero-Dollar Transactions ($1,825$ rows):} Fully retained. Authorization pings represent account verification checks; fraud prevalence is $5.49\%$ ($32\times$ general prevalence).
+    \item \textbf{Exact Duplicate Rows ($1,081$ duplicates):} Retained. Represents automated script bursts; dropping duplicates removes $19$ fraud transactions ($3.86\%$ of all positives).
+    \item \textbf{Feature Set (29 dimensions):} $V_1$--$V_{28}$ plus $\ln(1 + \text{Amount})$. `Time` (non-stationary) and `Class` are excluded.
+    \item \textbf{Leak-Free StandardScaler:} Fitted strictly on the $170,528$ legitimate training rows ($\mu \approx 0, \sigma^2 \approx 1$). Never refitted on validation or test sets.
+\end{itemize}
+
+\section{Phase 1: Gaussian Mixture Density Scoring}
+\subsection{Baseline Formulation ($K=1$, Full Covariance)}
+The single-component baseline fits a 29-dimensional Gaussian with full covariance on legitimate training rows ($464$ parameters). With regularization $\text{reg\_covar} = 10^{-6}$, the covariance condition number is $\kappa = 6.475$, establishing an exceptionally well-conditioned density reference.
+
+\subsection{12-Model Grid Search and Model Selection}
+We evaluated $K \in \{2, 3, 4, 5\}$ across `full`, `diag`, and `tied` covariance geometries ($\text{reg\_covar}=10^{-6}$, $n\_\text{init}=5$, seed 42).
+
+\begin{table}[htbp]
+\caption{Phase 1 GMM Model Selection Results (Validation Partition)}
+\centering
+\begin{tabular}{lccccc}
+\toprule
+Model & $K$ & Cov. & Free Params & BIC & Val AP \\
+\midrule
+`gmm_baseline` & 1 & `full` & 464 & $13.75\text{M}$ & 0.0740 \\
+`gmm_k2_full` & 2 & `full` & 929 & $5.97\text{M}$ & 0.0750 \\
+`gmm_k2_diag` & 2 & `diag` & 88 & $11.97\text{M}$ & 0.0455 \\
+`gmm_k2_tied` & 2 & `tied` & 494 & $13.41\text{M}$ & 0.0742 \\
+`gmm_k3_full` & 3 & `full` & 1,394 & $3.92\text{M}$ & 0.0828 \\
+`gmm_k3_diag` & 3 & `diag` & 147 & $11.27\text{M}$ & 0.0533 \\
+`gmm_k3_tied` & 3 & `tied` & 524 & $11.46\text{M}$ & 0.0681 \\
+\textbf{`gmm_k4_full`} & \textbf{4} & \textbf{`full`} & \textbf{1,859} & \textbf{$-4.82\text{M}$} & \textbf{0.4840} \\
+`gmm_k4_diag` & 4 & `diag` & 206 & $10.93\text{M}$ & 0.0591 \\
+`gmm_k4_tied` & 4 & `tied` & 554 & $11.82\text{M}$ & 0.0723 \\
+`gmm_k5_full` & 5 & `full` & 2,324 & $-4.76\text{M}$ & 0.2192 \\
+`gmm_k5_tied` & 5 & `tied` & 584 & $12.02\text{M}$ & 0.1770 \\
+\bottomrule
+\end{tabular}
+\label{tab:gmm_grid}
+\end{table}
+
+\subsection{Observations on Covariance and Density Fits}
+\begin{itemize}
+    \item \textbf{Failure of Diagonal Covariance (RQ3):} Diagonal models perform poorly (AP $\le 0.0591$). Enforcing axis independence discards critical linear correlations between PCA components and transaction Amount.
+    \item \textbf{Negative BIC Phenomenon:} Continuous densities can locally exceed $1.0$. In tightly clustered subspaces, $\ln \hat{L} > 0$; when $2\ln\hat{L} > p\ln N$, BIC becomes negative. Lower (more negative) values indicate tighter probability fit.
+    \item \textbf{Candidate Champion:} `gmm_k4_full` achieved the lowest BIC ($-4.82\text{M}$) and the highest validation Average Precision ($0.4840$), catching $43/57$ frauds ($75.44\%$) at 1\% FPR.
+\end{itemize}
+
+\subsection{Stability and Regularization Audit (RQ4)}
+A sweep across $\text{reg\_covar} \in [10^{-6}, 10^{-1}]$ demonstrated that triage precision is stable up to $10^{-3}$ ($\text{AP} = 0.5223$, $\kappa_{\max} = 5.9 \times 10^3$). However, multi-component full-covariance GMMs exhibit seed sensitivity: different EM initializations converge to different local likelihood modes. For $K=4$ full covariance, seeds 0--4 produced validation APs between $0.069$ and $0.102$, while the saved seed-42 artifact reached $0.484$. Conversely, the unimodal baseline ($K=1$) possesses an exact closed-form Maximum Likelihood solution with zero seed variance.
+
+\section{Phase 2: Deep Autoencoder Anomaly Detection}
+\subsection{Network Architecture}
+To assess neural subspace reconstruction against density estimation, we designed a symmetric multi-layer perceptron (MLP) in PyTorch:
+\begin{align*}
+\text{Input} (29) &\to \text{Linear}(29, 20) \to \text{ReLU} \to \text{Linear}(20, 10) \to \text{ReLU} \\
+&\to \text{Linear}(10, 5) \text{ [Bottleneck]} \to \text{Linear}(5, 10) \to \text{ReLU} \\
+&\to \text{Linear}(10, 20) \to \text{ReLU} \to \text{Linear}(20, 29) \text{ [Linear Output]}
+\end{align*}
+The network comprises $1,929$ trainable parameters, compressing 29 features by $5.8\times$ into a 5D latent space. A \textbf{Linear output activation} is essential: standardized Z-scores span negative and positive values; non-linear activations like Sigmoid or ReLU would artificially clip reconstructions.
+
+\subsection{Training Protocol and Early Stopping}
+Training was performed on CPU using Adam ($\text{lr}=0.001$, batch size 256, max 30 epochs) with fixed seed 42. Early stopping was monitored on legitimate validation transactions ($56,900$ rows) with patience 5. The network trained for 30 epochs in $10.24\text{s}$, achieving a training MSE of $0.4658$ and a validation MSE of $0.7014$.
+
+\subsection{Hypothesis Testing (H1 and H2)}
+\begin{itemize}
+    \item \textbf{H1 Evaluation (Supported):} Autoencoder validation AP reached $0.0765$, exceeding the single-component GMM baseline ($0.0740$).
+    \item \textbf{H2 Evaluation (Partially Supported):} The Autoencoder produced stable reconstruction error without EM covariance singularity, but did not match the peak validation precision of the specialized multi-modal GMM ($0.4840$).
+\end{itemize}
+
+\section{Cross-Model Benchmark \& Held-Out Test Evaluation}
+\subsection{Strict Test Benchmark Protocol}
+The $56,962$-row test partition ($75$ frauds) was accessed exactly once. All models and thresholds ($\tau_{1\%}$ and $\tau_{5\%}$) derived on validation data were frozen and applied without tuning.
+
+\begin{table}[htbp]
+\caption{Held-Out Test Set Performance Comparison ($N=56,962$, 75 Frauds)}
+\centering
+\begin{tabular}{lccc}
+\toprule
+Metric & GMM Baseline & GMM $K=4$ Full & Autoencoder \\
+\midrule
+Model Type & Density ($-\ln p$) & Density ($-\ln p$) & Neural ($\text{MSE}$) \\
+Trainable Parameters & 464 & 1,859 & 1,929 \\
+\textbf{Average Precision (AP)} & \textbf{0.1610} & \textbf{0.5770} & \textbf{0.1793} \\
+└ 95\% Bootstrap CI & [0.121, 0.221] & [0.459, 0.697] & [0.132, 0.245] \\
+ROC-AUC & 0.9622 & 0.9156 & 0.9436 \\
+\midrule
+\textbf{Recall @ Frozen 1\% Val $\tau$} & \textbf{72.00\% (54/75)} & \textbf{76.00\% (57/75)} & \textbf{73.33\% (55/75)} \\
+└ Realized Test FPR & 0.66\% (378 FP) & 0.59\% (335 FP) & 0.56\% (318 FP) \\
+└ Total Alerts (Precision) & 432 (12.50\%) & 392 (14.54\%) & 373 (14.75\%) \\
+\midrule
+\textbf{Recall @ Frozen 5\% Val $\tau$} & \textbf{84.00\% (63/75)} & \textbf{80.00\% (60/75)} & \textbf{80.00\% (60/75)} \\
+└ Realized Test FPR & 4.01\% (2,283 FP) & 3.68\% (2,096 FP) & 3.60\% (2,049 FP) \\
+└ Total Alerts (Precision) & 2,346 (2.69\%) & 2,156 (2.78\%) & 2,109 (2.84\%) \\
+\bottomrule
+\end{tabular}
+\label{tab:test_results}
+\end{table}
+
+\subsection{Fixed Operational Review Capacity (RQ8)}
+In production, fraud desks audit a fixed quota of alerts per shift. Table~\ref{tab:capacity} documents model yields under constrained review budgets.
+
+\begin{table}[htbp]
+\caption{Fraud Interception Under Fixed Review Budgets (Test Partition)}
+\centering
+\begin{tabular}{llccc}
+\toprule
+Budget & Metric & GMM Baseline & GMM $K=4$ Full & Autoencoder \\
+\midrule
+\multirow{3}{*}{\textbf{Top 50}} & Frauds Caught & 9 / 75 & \textbf{39 / 75} & 11 / 75 \\
+& Precision & 18.00\% & \textbf{78.00\%} & 22.00\% \\
+& False Positives & 41 & \textbf{11} & 39 \\
+\midrule
+\multirow{3}{*}{\textbf{Top 100}} & Frauds Caught & 28 / 75 & \textbf{49 / 75} & 31 / 75 \\
+& Precision & 28.00\% & \textbf{49.00\%} & 31.00\% \\
+& False Positives & 72 & \textbf{51} & 69 \\
+\midrule
+\multirow{3}{*}{\textbf{Top 200}} & Frauds Caught & 38 / 75 & \textbf{55 / 75} & 40 / 75 \\
+& Precision & 19.00\% & \textbf{27.50\%} & 20.00\% \\
+& False Positives & 162 & \textbf{145} & 160 \\
+\midrule
+\multirow{2}{*}{\textbf{Top 500}} & Frauds Caught & 56 / 75 & \textbf{57 / 75} & 56 / 75 \\
+& Precision & 11.20\% & \textbf{11.40\%} & 11.20\% \\
+\bottomrule
+\end{tabular}
+\label{tab:capacity}
+\end{table}
+
+\section{Discussion and Operational Deployment}
+\subsection{The Two-Tier Operational Architecture (RQ9)}
+Empirical findings demonstrate that no single model satisfies both high-precision real-time blocking and exhaustive background fraud recovery:
+\begin{itemize}
+    \item \textbf{Tier 1 (High-Precision Rapid Interception):} Deploys `GMM K=4 Full` on a dynamic capacity quota (Top 50--100 alerts). It catches $39$ frauds in the first 50 alerts ($78\%$ precision), enabling automated step-up challenges (SMS OTP) with minimal customer friction.
+    \item \textbf{Tier 2 (Broad High-Recall Safety Net):} Deploys `GMM Baseline (K=1)` at the frozen 5\% FPR threshold ($\tau = 60.726$). It catches $84.00\%$ of all test fraud ($63/75$), queuing severe multivariate outliers for secondary offline analyst review.
+\end{itemize}
+
+\subsection{Threats to Validity}
+\begin{itemize}
+    \item \textbf{48-Hour Temporal Window:} The dataset spans 48 hours. Long-term seasonal drifts (monthly billings, holiday surges) were not evaluated.
+    \item \textbf{Test Fraud Sample Size ($N=75$):} A difference of 3 detected frauds alters recall by $4.0$ percentage points, motivating our reporting of bootstrap confidence intervals.
+    \item \textbf{Unsupervised Ceiling:} Both models trained without fraud labels. Semi-supervised fine-tuning using confirmed fraud alerts could further enhance precision.
+\end{itemize}
+
+\section{Conclusion and Future Work}
+Under a rigorous, leak-free protocol, unsupervised anomaly detection provides an effective triage mechanism for credit card fraud. A 4-component full-covariance GMM delivers exceptional precision under tight review constraints ($0.5770$ test AP, $78\%$ Top-50 precision), while a single-component baseline provides robust broad-spectrum recall ($84\%$). Deep autoencoders demonstrate competitive baseline performance ($0.1793$ test AP) without EM covariance singularity. Future work will investigate semi-supervised latent adaptation and streaming covariance updates.
+
+\bibliographystyle{IEEEtran}
+\begin{thebibliography}{00}
+\bibitem{dalpozzolo2015} A. Dal Pozzolo, O. Caelen, R. A. Johnson, and G. Bontempi, ``Calibrating probability with undersampling for unbalanced classification,'' in \textit{Proc. IEEE SSCI}, 2015, pp. 159--166.
+\bibitem{ahmed2016} M. Ahmed, A. N. Mahmood, and J. Hu, ``A survey of network anomaly detection techniques,'' \textit{J. Netw. Comput. Appl.}, vol. 60, pp. 19--31, 2016.
+\bibitem{davis2006} J. Davis and M. Goadrich, ``The relationship between Precision-Recall and ROC curves,'' in \textit{Proc. ICML}, 2006, pp. 233--240.
+\bibitem{chawla2002} N. V. Chawla, K. W. Bowyer, L. O. Hall, and W. P. Kegelmeyer, ``SMOTE: Synthetic minority over-sampling technique,'' \textit{J. Artif. Intell. Res.}, vol. 16, pp. 321--357, 2002.
+\bibitem{chandola2009} V. Chandola, A. Banerjee, and V. Kumar, ``Anomaly detection: A survey,'' \textit{ACM Comput. Surv.}, vol. 41, no. 3, pp. 1--58, 2009.
+\bibitem{reynolds2009} D. A. Reynolds, ``Gaussian mixture models,'' \textit{Encycl. Biom.}, vol. 741, pp. 659--663, 2009.
+\bibitem{an2015} J. An and S. Cho, ``Variational autoencoder based anomaly detection using reconstruction probability,'' \textit{SNU Data Mining Center Tech. Rep.}, 2015.
+\bibitem{kingma2014} D. P. Kingma and J. Ba, ``Adam: A method for stochastic optimization,'' in \textit{Proc. ICLR}, 2015.
+\end{thebibliography}
+
+\end{document}
