@@ -214,7 +214,8 @@ card-fraud-triage/
 │   ├── 01_dataset_verification_eda.ipynb   # Raw data audit and exploratory distribution analysis
 │   ├── 02_preprocessing.ipynb              # Pipeline execution, scaling, and validation checks
 │   ├── 03_gmm_model_selection.ipynb        # Initial GMM baseline training and numerical audit
-│   └── 04_gmm_model_selection_experiments.ipynb # 12-model grid search, AIC/BIC, and triage plots
+│   ├── 04_gmm_model_selection_experiments.ipynb # 12-model grid search, AIC/BIC, and triage plots
+│   └── 05_autoencoder_training_and_evaluation.ipynb # Autoencoder training, loss curves, and PR triage eval
 │
 ├── reports/
 │   ├── data_cleaning_decisions.md          # Policy documenting retention of duplicate rows
